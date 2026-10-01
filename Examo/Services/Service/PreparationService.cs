@@ -1,5 +1,4 @@
-﻿
-using Examo.DTOs.Preparation;
+﻿using Examo.DTOs.Preparation;
 using Examo.Models;
 using Examo.Repositories.Interfaces;
 using Examo.Services.Interfaces;
@@ -40,6 +39,7 @@ public class PreparationService : IPreparationService
                 var preparation = new Preparation
                 {
                     ExamName = examName,
+                    Syllabus = null,
                     Status = "Not Started"
                 };
 
@@ -63,6 +63,7 @@ public class PreparationService : IPreparationService
         var preparation = new Preparation
         {
             ExamName = dto.ExamName,
+            Syllabus = dto.Syllabus,
             Status = dto.Status
         };
 
@@ -81,6 +82,7 @@ public class PreparationService : IPreparationService
         }
 
         preparation.ExamName = dto.ExamName;
+        preparation.Syllabus = dto.Syllabus;
         preparation.Status = dto.Status;
 
         return await _repository.UpdateAsync(preparation);
@@ -91,4 +93,3 @@ public class PreparationService : IPreparationService
         return await _repository.DeleteAsync(id);
     }
 }
-
