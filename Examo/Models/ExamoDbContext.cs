@@ -1,6 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using Microsoft.EntityFrameworkCore;
+﻿using Microsoft.EntityFrameworkCore;
 
 namespace Examo.Models;
 
@@ -16,103 +14,254 @@ public partial class ExamoDbContext : DbContext
     }
 
     public virtual DbSet<Exam> Exams { get; set; }
-
     public virtual DbSet<ExamForm> ExamForms { get; set; }
-
     public virtual DbSet<Preparation> Preparations { get; set; }
-
     public virtual DbSet<Schedule> Schedules { get; set; }
-
     public virtual DbSet<Student> Students { get; set; }
-
     public virtual DbSet<Subject> Subjects { get; set; }
-
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-#warning To protect potentially sensitive information in your connection string, you should move it out of source code. You can avoid scaffolding the connection string by using the Name= syntax to read it from configuration - see https://go.microsoft.com/fwlink/?linkid=2131148. For more guidance on storing connection strings, see https://go.microsoft.com/fwlink/?LinkId=723263.
-        => optionsBuilder.UseSqlServer("Server=DESKTOP-7E71OKM\\MSSQLSERVER01;Database=Examo;Trusted_Connection=True;TrustServerCertificate=True;");
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
-        modelBuilder.Entity<Exam>(entity =>
+        // =========================
+        // Students
+        // =========================
+        modelBuilder.Entity<Student>(entity =>
         {
-            entity.HasKey(e => e.Id)
-                .HasName("PK__Exams__3214EC0763E353FB");
+            entity.ToTable("Students");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Name)
+                .HasColumnName("Name")
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(e => e.Email)
+                .HasColumnName("Email")
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.HasIndex(e => e.Email)
+                .IsUnique();
+
+            entity.Property(e => e.Course)
+                .HasColumnName("Course")
+                .HasMaxLength(150);
+
+            entity.Property(e => e.Age)
+                .HasColumnName("Age");
+
+            entity.Property(e => e.City)
+                .HasColumnName("City")
+                .HasMaxLength(100);
 
             entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())");
-
-            entity.Property(e => e.ExamName)
-                .HasMaxLength(200);
-
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValue("Coming Soon");
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
+
+        // =========================
+        // ExamForms
+        // =========================
         modelBuilder.Entity<ExamForm>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__ExamForm__3214EC0724B99665");
+            entity.ToTable("ExamForms");
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.ExamName).HasMaxLength(200);
-            entity.Property(e => e.Link).HasMaxLength(500);
-            entity.Property(e => e.Status)
-                .HasMaxLength(20)
-                .HasDefaultValue("Pending");
-        });
+            entity.HasKey(e => e.Id);
 
-        modelBuilder.Entity<Preparation>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Preparat__3214EC07D874142C");
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.ExamName).HasMaxLength(200);
-            entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .HasDefaultValue("Not Started");
-        });
+            entity.Property(e => e.ExamName)
+                .HasColumnName("ExamName")
+                .HasMaxLength(200)
+                .IsRequired();
 
-        modelBuilder.Entity<Schedule>(entity =>
-        {
-            entity.HasKey(e => e.Id).HasName("PK__Schedule__3214EC07723DE7C2");
+            entity.Property(e => e.RegisterStartDate)
+                .HasColumnName("RegisterStartDate")
+                .HasColumnType("date")
+                .IsRequired();
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Description).HasMaxLength(500);
-            entity.Property(e => e.Subject).HasMaxLength(150);
-        });
-
-        modelBuilder.Entity<Subject>(entity =>
-        {
-            entity.HasKey(e => e.Id)
-                .HasName("PK__Subjects__3214EC071807C35B");
-
-            entity.Property(e => e.CreatedAt)
-                .HasDefaultValueSql("(getdate())");
+            entity.Property(e => e.RegisterEndDate)
+                .HasColumnName("RegisterEndDate")
+                .HasColumnType("date")
+                .IsRequired();
 
             entity.Property(e => e.Link)
-                .HasMaxLength(500);
-
-            entity.Property(e => e.Pdf)
+                .HasColumnName("Link")
                 .HasMaxLength(500);
 
             entity.Property(e => e.Status)
-                .HasMaxLength(50)
-                .HasDefaultValue("Not Started");
+                .HasColumnName("Status")
+                .HasMaxLength(20)
+                .HasDefaultValue("Pending")
+                .IsRequired();
 
-            entity.Property(e => e.SubjectName)
-                .HasMaxLength(150);
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
+        // =========================
+        // Exams
+        // =========================
+        modelBuilder.Entity<Exam>(entity =>
+        {
+            entity.ToTable("Exams");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.ExamName)
+                .HasColumnName("ExamName")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.ExamDate)
+                .HasColumnName("ExamDate")
+                .HasColumnType("date");
+
+            entity.Property(e => e.Status)
+                .HasColumnName("Status")
+                .HasMaxLength(20)
+                .HasDefaultValue("Coming Soon")
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // Preparations
+        // =========================
+        modelBuilder.Entity<Preparation>(entity =>
+        {
+            entity.ToTable("Preparations");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.ExamName)
+                .HasColumnName("ExamName")
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasColumnName("Status")
+                .HasMaxLength(50)
+                .HasDefaultValue("Not Started")
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // Schedules
+        // =========================
+        modelBuilder.Entity<Schedule>(entity =>
+        {
+            entity.ToTable("Schedules");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.Subject)
+                .HasColumnName("Subject")
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(e => e.ScheduleDate)
+                .HasColumnName("ScheduleDate")
+                .HasColumnType("date")
+                .IsRequired();
+
+            entity.Property(e => e.StartTime)
+                .HasColumnName("StartTime")
+                .HasColumnType("time")
+                .IsRequired();
+
+            entity.Property(e => e.EndTime)
+                .HasColumnName("EndTime")
+                .HasColumnType("time");
+
+            entity.Property(e => e.Description)
+                .HasColumnName("Description")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Lecture)
+                .HasColumnName("Lecture");
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // Subjects
+        // =========================
         modelBuilder.Entity<Subject>(entity =>
         {
-            entity.HasKey(e => e.Id).HasName("PK__Subjects__3214EC071807C35B");
+            entity.ToTable("Subjects");
 
-            entity.Property(e => e.CreatedAt).HasDefaultValueSql("(getdate())");
-            entity.Property(e => e.Link).HasMaxLength(500);
-            entity.Property(e => e.Pdf).HasMaxLength(500);
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Id)
+                .HasColumnName("Id")
+                .ValueGeneratedOnAdd();
+
+            entity.Property(e => e.SubjectName)
+                .HasColumnName("SubjectName")
+                .HasMaxLength(150)
+                .IsRequired();
+
             entity.Property(e => e.Status)
+                .HasColumnName("Status")
                 .HasMaxLength(50)
-                .HasDefaultValue("Not Started");
-            entity.Property(e => e.SubjectName).HasMaxLength(150);
+                .HasDefaultValue("Not Started")
+                .IsRequired();
+
+            entity.Property(e => e.Materials)
+                .HasColumnName("Materials");
+
+            entity.Property(e => e.Pdf)
+                .HasColumnName("Pdf")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Link)
+                .HasColumnName("Link")
+                .HasMaxLength(500);
+
+            entity.Property(e => e.Lectures)
+                .HasColumnName("Lectures")
+                .HasDefaultValue(0)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .HasColumnName("CreatedAt")
+                .HasColumnType("timestamp without time zone")
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
         });
 
         OnModelCreatingPartial(modelBuilder);
