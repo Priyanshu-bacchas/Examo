@@ -161,6 +161,9 @@ public partial class ExamoDbContext : DbContext
                 .HasMaxLength(200)
                 .IsRequired();
 
+            entity.Property(e => e.Syllabus)
+                .HasColumnName("Syllabus");
+
             entity.Property(e => e.Status)
                 .HasColumnName("Status")
                 .HasMaxLength(50)

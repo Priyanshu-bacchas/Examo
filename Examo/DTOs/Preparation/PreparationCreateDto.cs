@@ -8,6 +8,8 @@ public class PreparationCreateDto
     [MaxLength(200)]
     public string ExamName { get; set; } = string.Empty;
 
+    public string? Syllabus { get; set; }
+
     [Required]
     [RegularExpression(
         "^(Not Started|In Progress|Completed)$",
