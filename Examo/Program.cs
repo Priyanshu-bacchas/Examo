@@ -8,88 +8,60 @@ using Microsoft.Extensions.FileProviders;
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Database
+// =========================
+// Database - Neon PostgreSQL
+// =========================
 builder.Services.AddDbContext<ExamoDbContext>(options =>
-    options.UseSqlServer(
-        builder.Configuration.GetConnectionString(
-            "DefaultConnection"
-        )
+    options.UseNpgsql(
+        builder.Configuration.GetConnectionString("DefaultConnection")
     ));
 
+// =========================
 // Repositories
-builder.Services.AddScoped<
-    IStudentRepository,
-    StudentRepository>();
+// =========================
+builder.Services.AddScoped<IStudentRepository, StudentRepository>();
+builder.Services.AddScoped<IExamFormRepository, ExamFormRepository>();
+builder.Services.AddScoped<IExamRepository, ExamRepository>();
+builder.Services.AddScoped<IPreparationRepository, PreparationRepository>();
+builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
+builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 
-builder.Services.AddScoped<
-    IExamFormRepository,
-    ExamFormRepository>();
-
-builder.Services.AddScoped<
-    IExamRepository,
-    ExamRepository>();
-
-builder.Services.AddScoped<
-    IPreparationRepository,
-    PreparationRepository>();
-
-builder.Services.AddScoped<
-    ISubjectRepository,
-    SubjectRepository>();
-
-builder.Services.AddScoped<
-    IScheduleRepository,
-    ScheduleRepository>();
-
+// =========================
 // Services
-builder.Services.AddScoped<
-    IStudentService,
-    StudentService>();
+// =========================
+builder.Services.AddScoped<IStudentService, StudentService>();
+builder.Services.AddScoped<IExamFormService, ExamFormService>();
+builder.Services.AddScoped<IExamService, ExamService>();
+builder.Services.AddScoped<IPreparationService, PreparationService>();
+builder.Services.AddScoped<ISubjectService, SubjectService>();
+builder.Services.AddScoped<IScheduleService, ScheduleService>();
 
-builder.Services.AddScoped<
-    IExamFormService,
-    ExamFormService>();
-
-builder.Services.AddScoped<
-    IExamService,
-    ExamService>();
-
-builder.Services.AddScoped<
-    IPreparationService,
-    PreparationService>();
-
-builder.Services.AddScoped<
-    ISubjectService,
-    SubjectService>();
-
-builder.Services.AddScoped<
-    IScheduleService,
-    ScheduleService>();
-
-// Controllers
 builder.Services.AddControllers();
 
+// =========================
 // CORS
+// =========================
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("ReactApp", policy =>
     {
-        policy
-            .WithOrigins(
-                "http://localhost:5173"
-            )
-            .AllowAnyHeader()
-            .AllowAnyMethod();
+        policy.WithOrigins("http://localhost:5173")
+              .AllowAnyHeader()
+              .AllowAnyMethod();
     });
 });
 
+// =========================
 // Swagger
+// =========================
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 var app = builder.Build();
 
+// =========================
 // Swagger
+// =========================
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -98,30 +70,24 @@ if (app.Environment.IsDevelopment())
 
 app.UseHttpsRedirection();
 
-// CORS
 app.UseCors("ReactApp");
 
-// Serve UploadedFiles folder
+// =========================
+// Uploaded Files
+// =========================
 var uploadedFilesPath = Path.Combine(
     builder.Environment.ContentRootPath,
     "UploadedFiles"
 );
 
 Directory.CreateDirectory(
-    Path.Combine(
-        uploadedFilesPath,
-        "Subjects"
-    )
+    Path.Combine(uploadedFilesPath, "Subjects")
 );
 
 app.UseStaticFiles(
     new StaticFileOptions
     {
-        FileProvider =
-            new PhysicalFileProvider(
-                uploadedFilesPath
-            ),
-
+        FileProvider = new PhysicalFileProvider(uploadedFilesPath),
         RequestPath = "/UploadedFiles"
     }
 );
