@@ -8,16 +8,18 @@ public class StudentUpdateDto
     [MaxLength(150)]
     public string Name { get; set; } = string.Empty;
 
+    [MaxLength(50)]
+    public string? MobileNumber { get; set; }
+
     [Required]
     [EmailAddress]
-    [MaxLength(150)]
+    [MaxLength(200)]
     public string Email { get; set; } = string.Empty;
 
-    [MaxLength(150)]
-    public string? Course { get; set; }
+    [MaxLength(20)]
+    public string Role { get; set; } = "Student";
 
-    public int? Age { get; set; }
-
+    // Khali / null = purana password waisa hi rahega
     [MaxLength(100)]
-    public string? City { get; set; }
+    public string? Password { get; set; }
 }

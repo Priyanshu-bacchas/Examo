@@ -13,10 +13,10 @@ public class StudentRepository : IStudentRepository
         _context = context;
     }
 
-    public async Task<IEnumerable<Student>> GetAllAsync()
+    public async Task<List<Student>> GetAllAsync()
     {
         return await _context.Students
-            .AsNoTracking()
+            .OrderByDescending(x => x.CreatedAt)
             .ToListAsync();
     }
 
@@ -24,6 +24,42 @@ public class StudentRepository : IStudentRepository
     {
         return await _context.Students
             .FirstOrDefaultAsync(x => x.Id == id);
+    }
+
+    public async Task<Student?> GetByEmailAsync(string email)
+    {
+        email = email.Trim().ToLowerInvariant();
+
+        return await _context.Students
+            .FirstOrDefaultAsync(x => x.Email == email);
+    }
+
+    public async Task<Student?> GetByMobileNumberAsync(
+        string mobileNumber)
+    {
+        mobileNumber = mobileNumber.Trim();
+
+        return await _context.Students
+            .FirstOrDefaultAsync(x => x.MobileNumber == mobileNumber);
+    }
+
+    public async Task<Student?> GetByIdentifierAsync(
+        string identifier)
+    {
+        identifier = identifier.Trim();
+
+        if (identifier.Contains("@"))
+        {
+            identifier = identifier.ToLowerInvariant();
+
+            return await _context.Students
+                .FirstOrDefaultAsync(x =>
+                    x.Email == identifier);
+        }
+
+        return await _context.Students
+            .FirstOrDefaultAsync(x =>
+                x.MobileNumber == identifier);
     }
 
     public async Task<Student> AddAsync(Student student)
@@ -48,13 +84,48 @@ public class StudentRepository : IStudentRepository
             .FirstOrDefaultAsync(x => x.Id == id);
 
         if (student == null)
-        {
             return false;
-        }
 
         _context.Students.Remove(student);
+
         await _context.SaveChangesAsync();
 
         return true;
+    }
+
+    public async Task<bool> EmailExistsAsync(
+        string email,
+        int? excludeId = null)
+    {
+        email = email.Trim().ToLowerInvariant();
+
+        var query = _context.Students
+            .Where(x => x.Email == email);
+
+        if (excludeId.HasValue)
+        {
+            query = query.Where(
+                x => x.Id != excludeId.Value);
+        }
+
+        return await query.AnyAsync();
+    }
+
+    public async Task<bool> MobileExistsAsync(
+        string mobileNumber,
+        int? excludeId = null)
+    {
+        mobileNumber = mobileNumber.Trim();
+
+        var query = _context.Students
+            .Where(x => x.MobileNumber == mobileNumber);
+
+        if (excludeId.HasValue)
+        {
+            query = query.Where(
+                x => x.Id != excludeId.Value);
+        }
+
+        return await query.AnyAsync();
     }
 }
