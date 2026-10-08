@@ -16,4 +16,14 @@ public interface IStudentService
         StudentUpdateDto dto);
 
     Task<bool> DeleteAsync(int id);
+
+    // Admin: kisi bhi user ka password reset
+    Task<Student?> ResetPasswordAsync(
+        int id,
+        string newPassword);
+
+    // Admin: user ko block / unblock
+    Task<Student?> SetBlockedAsync(
+        int id,
+        bool isBlocked);
 }

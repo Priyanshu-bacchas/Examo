@@ -26,6 +26,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<Subject> Subjects { get; set; }
 
+    public virtual DbSet<ActivityLog> ActivityLogs { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -225,6 +227,41 @@ public partial class ExamoDbContext : DbContext
 
             entity.Property(e => e.Link)
                 .HasMaxLength(500);
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // ACTIVITY LOGS
+        // =========================
+
+        modelBuilder.Entity<ActivityLog>(entity =>
+        {
+            entity.ToTable("ActivityLogs");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.UserName)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(e => e.UserEmail)
+                .HasMaxLength(200);
+
+            entity.Property(e => e.Role)
+                .HasMaxLength(20);
+
+            entity.Property(e => e.Action)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Details)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.IpAddress)
+                .HasMaxLength(64);
 
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(

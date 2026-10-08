@@ -1,11 +1,13 @@
 ﻿using Examo.DTOs.Auth;
 using Examo.Services.Interfaces;
 
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Examo.Controllers;
 
 [ApiController]
+[AllowAnonymous]
 [Route("api/[controller]")]
 public class AuthController : ControllerBase
 {
@@ -52,20 +54,33 @@ public class AuthController : ControllerBase
     public async Task<IActionResult> Login(
         [FromBody] LoginDto dto)
     {
-        var result =
-            await _authService
-                .LoginAsync(dto);
-
-        if (result == null)
+        try
         {
-            return Unauthorized(new
-            {
-                message =
-                    "Invalid email/mobile number or password."
-            });
-        }
+            var result =
+                await _authService
+                    .LoginAsync(dto);
 
-        return Ok(result);
+            if (result == null)
+            {
+                return Unauthorized(new
+                {
+                    message =
+                        "Invalid email/mobile number or password."
+                });
+            }
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            // Blocked account
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    message = ex.Message
+                });
+        }
     }
 
     // =====================================================

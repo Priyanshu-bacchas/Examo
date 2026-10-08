@@ -19,14 +19,20 @@ public class AuthService : IAuthService
 {
     private readonly IStudentRepository _studentRepository;
     private readonly IConfiguration _configuration;
+    private const string BlockedMessage =
+        "Your account has been blocked. Please contact the admin.";
+
+    private readonly IActivityLogService _activityLog;
     private readonly PasswordHasher<Student> _passwordHasher;
 
     public AuthService(
         IStudentRepository studentRepository,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        IActivityLogService activityLog)
     {
         _studentRepository = studentRepository;
         _configuration = configuration;
+        _activityLog = activityLog;
 
         _passwordHasher =
             new PasswordHasher<Student>();
@@ -85,16 +91,24 @@ public class AuthService : IAuthService
             // Public registration is always Student.
             Role = "Student",
 
-            CreatedAt = DateTime.UtcNow
-        };
+            CreatedAt = DateTime.UtcNow,
 
-        student.PasswordHash =
-            _passwordHasher.HashPassword(
-                student,
-                dto.Password);
+            // Login password (StudentService jaisa hi: plain, hash nahi)
+            Password = dto.Password,
+
+            PasswordHash = string.Empty
+        };
 
         var savedStudent =
             await _studentRepository.AddAsync(student);
+
+        await _activityLog.LogAsync(
+            "Register",
+            "New account created",
+            savedStudent.Id,
+            savedStudent.Name,
+            savedStudent.Email,
+            savedStudent.Role);
 
         return new AuthResponseDto
         {
@@ -121,25 +135,52 @@ public class AuthService : IAuthService
                 .GetByIdentifierAsync(identifier);
 
         if (student == null)
-            return null;
-
-        if (string.IsNullOrWhiteSpace(
-            student.PasswordHash))
         {
+            await _activityLog.LogAsync(
+                "Login Failed",
+                $"Unknown account: {identifier}",
+                userName: identifier,
+                success: false);
+
             return null;
         }
 
-        var passwordResult =
-            _passwordHasher.VerifyHashedPassword(
-                student,
-                student.PasswordHash,
-                dto.Password);
-
-        if (passwordResult ==
-            PasswordVerificationResult.Failed)
+        if (!IsPasswordValid(student, dto.Password))
         {
+            await _activityLog.LogAsync(
+                "Login Failed",
+                "Wrong password",
+                student.Id,
+                student.Name,
+                student.Email,
+                student.Role,
+                success: false);
+
             return null;
         }
+
+        if (student.IsBlocked)
+        {
+            await _activityLog.LogAsync(
+                "Login Blocked",
+                "Blocked account tried to log in",
+                student.Id,
+                student.Name,
+                student.Email,
+                student.Role,
+                success: false);
+
+            throw new UnauthorizedAccessException(
+                BlockedMessage);
+        }
+
+        await _activityLog.LogAsync(
+            "Login",
+            "Logged in with password",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
 
         return new AuthResponseDto
         {
@@ -288,11 +329,69 @@ public class AuthService : IAuthService
             }
         }
 
+        if (student.IsBlocked)
+        {
+            await _activityLog.LogAsync(
+                "Login Blocked",
+                "Blocked account tried to log in with Google",
+                student.Id,
+                student.Name,
+                student.Email,
+                student.Role,
+                success: false);
+
+            throw new UnauthorizedAccessException(
+                BlockedMessage);
+        }
+
+        await _activityLog.LogAsync(
+            "Login",
+            "Logged in with Google",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
+
         return new AuthResponseDto
         {
             Token = GenerateToken(student),
             User = MapStudent(student)
         };
+    }
+
+    // =========================
+    // PASSWORD CHECK
+    // =========================
+
+    // Naya system: plain Password column (admin reset isi ko badalta hai).
+    // Purane accounts: PasswordHash se verify.
+    private bool IsPasswordValid(
+        Student student,
+        string? password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return false;
+
+        if (!string.IsNullOrEmpty(student.Password))
+        {
+            return student.Password == password;
+        }
+
+        if (string.IsNullOrWhiteSpace(student.PasswordHash))
+            return false;
+
+        try
+        {
+            return _passwordHasher.VerifyHashedPassword(
+                student,
+                student.PasswordHash,
+                password)
+                != PasswordVerificationResult.Failed;
+        }
+        catch (FormatException)
+        {
+            return false;
+        }
     }
 
     // =========================
