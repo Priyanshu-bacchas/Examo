@@ -23,5 +23,8 @@ public class Student
 
     public string Role { get; set; } = "Student";
 
+    // Admin ne block kiya ho to user login nahi kar sakta
+    public bool IsBlocked { get; set; }
+
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 }

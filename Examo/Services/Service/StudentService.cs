@@ -164,6 +164,9 @@ public class StudentService : IStudentService
         if (!string.IsNullOrWhiteSpace(dto.Password))
         {
             student.Password = dto.Password;
+
+            // Purana hash hata do, warna purana password bhi chalta rahega
+            student.PasswordHash = string.Empty;
         }
 
         return await _repository.UpdateAsync(
@@ -173,6 +176,49 @@ public class StudentService : IStudentService
     public async Task<bool> DeleteAsync(int id)
     {
         return await _repository.DeleteAsync(id);
+    }
+
+    public async Task<Student?> SetBlockedAsync(
+        int id,
+        bool isBlocked)
+    {
+        var student =
+            await _repository.GetByIdAsync(id);
+
+        if (student == null)
+            return null;
+
+        student.IsBlocked = isBlocked;
+
+        return await _repository.UpdateAsync(student);
+    }
+
+    public async Task<Student?> ResetPasswordAsync(
+        int id,
+        string newPassword)
+    {
+        if (string.IsNullOrWhiteSpace(newPassword))
+            throw new InvalidOperationException(
+                "New password is required.");
+
+        if (newPassword.Length < MinPasswordLength)
+        {
+            throw new InvalidOperationException(
+                $"Password must be at least {MinPasswordLength} characters.");
+        }
+
+        var student =
+            await _repository.GetByIdAsync(id);
+
+        if (student == null)
+            return null;
+
+        student.Password = newPassword;
+
+        // Purana hash hata do, warna purana password bhi chalta rahega
+        student.PasswordHash = string.Empty;
+
+        return await _repository.UpdateAsync(student);
     }
 
     private static void ValidatePassword(string? password)

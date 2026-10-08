@@ -20,4 +20,7 @@ public partial class Subject
     public string? Link { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    // Is record ka owner (Students.Id). Har user sirf apna data dekhta hai.
+    public int? UserId { get; set; }
 }

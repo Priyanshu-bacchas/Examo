@@ -10,25 +10,32 @@ public class PreparationService : IPreparationService
 {
     private readonly IPreparationRepository _repository;
     private readonly ExamoDbContext _context;
+    private readonly ICurrentUserService _currentUser;
 
     public PreparationService(
         IPreparationRepository repository,
-        ExamoDbContext context)
+        ExamoDbContext context,
+        ICurrentUserService currentUser)
     {
         _repository = repository;
         _context = context;
+        _currentUser = currentUser;
     }
 
     public async Task<IEnumerable<Preparation>> GetAllAsync()
     {
-        // ExamForm ke saare ExamName Preparation me sync karo
+        var userId = _currentUser.UserId;
+
+        // Sirf is user ke ExamForm names Preparation me sync karo
         var examFormNames = await _context.ExamForms
             .AsNoTracking()
+            .Where(x => x.UserId == userId)
             .Select(x => x.ExamName)
             .Distinct()
             .ToListAsync();
 
         var existingPreparationNames = await _context.Preparations
+            .Where(x => x.UserId == userId)
             .Select(x => x.ExamName)
             .ToListAsync();
 
@@ -40,7 +47,8 @@ public class PreparationService : IPreparationService
                 {
                     ExamName = examName,
                     Syllabus = null,
-                    Status = "Not Started"
+                    Status = "Not Started",
+                    UserId = userId
                 };
 
                 await _context.Preparations.AddAsync(preparation);

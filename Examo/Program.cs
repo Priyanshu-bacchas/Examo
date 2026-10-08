@@ -1,5 +1,7 @@
+using System.Security.Claims;
 using System.Text;
 
+using Examo.Filters;
 using Examo.Models;
 using Examo.Repositories;
 using Examo.Repositories.Interfaces;
@@ -10,7 +12,9 @@ using FirebaseAdmin;
 using Google.Apis.Auth.OAuth2;
 
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.FileProviders;
 using Microsoft.IdentityModel.Tokens;
 using Npgsql;
@@ -109,6 +113,16 @@ builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 // SERVICES
 // =====================================================
 
+// Logged-in user ki Id / role (JWT se) - data isolation ke liye
+builder.Services.AddHttpContextAccessor();
+
+builder.Services.AddMemoryCache();
+
+builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
+
+// Logs & Security
+builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddScoped<IStudentService, StudentService>();
@@ -168,11 +182,67 @@ builder.Services
                 NameClaimType =
                     "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name"
             };
+
+        // Blocked (ya delete hue) user ka purana token bhi kaam nahi karega
+        options.Events = new JwtBearerEvents
+        {
+            OnTokenValidated = async context =>
+            {
+                var idValue =
+                    context.Principal?
+                        .FindFirstValue(ClaimTypes.NameIdentifier);
+
+                if (!int.TryParse(idValue, out var userId))
+                {
+                    context.Fail("Invalid user.");
+                    return;
+                }
+
+                var services = context.HttpContext.RequestServices;
+
+                var cache =
+                    services.GetRequiredService<IMemoryCache>();
+
+                var cacheKey = $"user-denied:{userId}";
+
+                if (!cache.TryGetValue(cacheKey, out bool denied))
+                {
+                    var db =
+                        services.GetRequiredService<ExamoDbContext>();
+
+                    var state = await db.Students
+                        .AsNoTracking()
+                        .Where(x => x.Id == userId)
+                        .Select(x => (bool?)x.IsBlocked)
+                        .FirstOrDefaultAsync();
+
+                    // null = user delete ho chuka, true = blocked
+                    denied = state != false;
+
+                    cache.Set(
+                        cacheKey,
+                        denied,
+                        TimeSpan.FromSeconds(30));
+                }
+
+                if (denied)
+                {
+                    context.Fail("Account blocked or removed.");
+                }
+            }
+        };
     });
 
 builder.Services.AddAuthorization();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    // Har endpoint par login zaroori (sirf AuthController [AllowAnonymous] hai)
+    options.Filters.Add(new AuthorizeFilter());
+
+    // Har successful POST/PUT/DELETE ko Logs & Security me likho
+    options.Filters.Add<AuditLogFilter>();
+});
 
 // =====================================================
 // CORS

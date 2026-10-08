@@ -16,6 +16,8 @@ public class StudentResponseDto
 
     public string Role { get; set; } = "Student";
 
+    public bool IsBlocked { get; set; }
+
     public DateTime CreatedAt { get; set; }
 
     public static StudentResponseDto From(Models.Student s)
@@ -28,6 +30,7 @@ public class StudentResponseDto
             Email = s.Email,
             Password = s.Password,
             Role = s.Role,
+            IsBlocked = s.IsBlocked,
             CreatedAt = s.CreatedAt
         };
     }
