@@ -123,6 +123,12 @@ builder.Services.AddScoped<ICurrentUserService, CurrentUserService>();
 // Logs & Security
 builder.Services.AddScoped<IActivityLogService, ActivityLogService>();
 
+// System health: CPU / memory history (background sampling)
+builder.Services.AddSingleton<SystemMetricsService>();
+
+builder.Services.AddHostedService(sp =>
+    sp.GetRequiredService<SystemMetricsService>());
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddScoped<IStudentService, StudentService>();
