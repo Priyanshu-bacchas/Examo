@@ -10,15 +10,18 @@ public class ExamFormService : IExamFormService
     private readonly IExamFormRepository _repository;
     private readonly IExamRepository _examRepository;
     private readonly IPreparationRepository _preparationRepository;
+    private readonly IExamResultRepository _resultRepository;
 
     public ExamFormService(
         IExamFormRepository repository,
         IExamRepository examRepository,
-        IPreparationRepository preparationRepository)
+        IPreparationRepository preparationRepository,
+        IExamResultRepository resultRepository)
     {
         _repository = repository;
         _examRepository = examRepository;
         _preparationRepository = preparationRepository;
+        _resultRepository = resultRepository;
     }
 
     public async Task<IEnumerable<ExamForm>> GetAllAsync()
@@ -63,6 +66,20 @@ public class ExamFormService : IExamFormService
         };
 
         await _preparationRepository.AddAsync(preparation);
+
+        // Automatically create Result (Awaited) taaki Results page me turant aaye.
+        var existingResults =
+            await _resultRepository.GetAllAsync();
+
+        if (!existingResults.Any(x =>
+                x.ExamName == dto.ExamName))
+        {
+            await _resultRepository.AddAsync(new ExamResult
+            {
+                ExamName = dto.ExamName,
+                Result = "Awaited"
+            });
+        }
 
         return savedExamForm;
     }

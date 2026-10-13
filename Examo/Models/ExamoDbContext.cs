@@ -28,6 +28,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<ActivityLog> ActivityLogs { get; set; }
 
+    public virtual DbSet<ExamResult> Results { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -227,6 +229,30 @@ public partial class ExamoDbContext : DbContext
 
             entity.Property(e => e.Link)
                 .HasMaxLength(500);
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // RESULTS
+        // =========================
+
+        modelBuilder.Entity<ExamResult>(entity =>
+        {
+            entity.ToTable("Results");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.ExamName)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Result)
+                .HasMaxLength(50)
+                .IsRequired()
+                .HasDefaultValue("Awaited");
 
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(
