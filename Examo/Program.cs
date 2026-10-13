@@ -106,6 +106,7 @@ builder.Services.AddScoped<IStudentRepository, StudentRepository>();
 builder.Services.AddScoped<IExamFormRepository, ExamFormRepository>();
 builder.Services.AddScoped<IExamRepository, ExamRepository>();
 builder.Services.AddScoped<IPreparationRepository, PreparationRepository>();
+builder.Services.AddScoped<IExamResultRepository, ExamResultRepository>();
 builder.Services.AddScoped<ISubjectRepository, SubjectRepository>();
 builder.Services.AddScoped<IScheduleRepository, ScheduleRepository>();
 
@@ -135,6 +136,7 @@ builder.Services.AddScoped<IStudentService, StudentService>();
 builder.Services.AddScoped<IExamFormService, ExamFormService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IPreparationService, PreparationService>();
+builder.Services.AddScoped<IExamResultService, ExamResultService>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
 
