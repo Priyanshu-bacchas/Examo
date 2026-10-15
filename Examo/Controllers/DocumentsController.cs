@@ -26,10 +26,19 @@ public class DocumentsController : ControllerBase
 
     // multipart/form-data: name (optional) + file
     [HttpPost]
+    [RequestSizeLimit(12 * 1024 * 1024)]
     public async Task<IActionResult> Create(
         [FromForm] string? name,
         IFormFile file)
     {
+        if (file == null || file.Length == 0)
+        {
+            return BadRequest(new
+            {
+                message = "Please select a file."
+            });
+        }
+
         try
         {
             var document =
@@ -45,6 +54,7 @@ public class DocumentsController : ControllerBase
         }
         catch (InvalidOperationException ex)
         {
+            // Storage (Supabase) ki dikkat
             return StatusCode(
                 StatusCodes.Status502BadGateway,
                 new { message = ex.Message });

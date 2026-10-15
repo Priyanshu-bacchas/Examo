@@ -75,6 +75,12 @@ public class SubjectService : ISubjectService
         int id,
         IFormFile file)
     {
+        if (file == null || file.Length == 0)
+        {
+            throw new ArgumentException(
+                "Please select a PDF file.");
+        }
+
         var subject = await _repository.GetByIdAsync(id);
 
         if (subject == null)
@@ -82,6 +88,9 @@ public class SubjectService : ISubjectService
             return null;
         }
 
+        // Sirf extension dekhte hain. Browser / mobile kabhi PDF ka
+        // ContentType galat bhejte hain (octet-stream, x-pdf), isliye
+        // uspe bharosa nahi - asli check neeche "%PDF-" signature se hota hai.
         var extension = Path.GetExtension(file.FileName);
 
         if (!string.Equals(
@@ -93,19 +102,16 @@ public class SubjectService : ISubjectService
                 "Only PDF files are allowed.");
         }
 
-        if (!string.Equals(
-                file.ContentType,
-                "application/pdf",
-                StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException(
-                "Only PDF files are allowed.");
-        }
-
         if (file.Length > MaxPdfBytes)
         {
             throw new ArgumentException(
                 "PDF is too large. Maximum size is 10 MB.");
+        }
+
+        if (!await LooksLikePdfAsync(file))
+        {
+            throw new ArgumentException(
+                "This file is not a valid PDF.");
         }
 
         var path =
@@ -197,4 +203,32 @@ public class SubjectService : ISubjectService
     private static bool IsStoragePath(string? path) =>
         !string.IsNullOrWhiteSpace(path) &&
         path.StartsWith("users/", StringComparison.Ordinal);
+
+    // Asli PDF "%PDF-" se shuru hoti hai
+    private static async Task<bool> LooksLikePdfAsync(IFormFile file)
+    {
+        var header = new byte[5];
+
+        await using var stream = file.OpenReadStream();
+
+        var read = 0;
+
+        while (read < header.Length)
+        {
+            var n = await stream.ReadAsync(
+                header.AsMemory(read, header.Length - read));
+
+            if (n == 0)
+                break;
+
+            read += n;
+        }
+
+        return read == header.Length &&
+               header[0] == (byte)'%' &&
+               header[1] == (byte)'P' &&
+               header[2] == (byte)'D' &&
+               header[3] == (byte)'F' &&
+               header[4] == (byte)'-';
+    }
 }

@@ -28,6 +28,10 @@ public class SupabaseStorageService : ISupabaseStorageService
     private string BaseUrl =>
         _options.Url.TrimEnd('/') + "/storage/v1";
 
+    // Key ke aaju-baaju space / quotes (env variable me aksar aa jaate hain) hata do
+    private string Key =>
+        (_options.SecretKey ?? string.Empty).Trim().Trim('"', '\'').Trim();
+
     private string BucketPart =>
         Uri.EscapeDataString(_options.Bucket);
 
@@ -38,7 +42,7 @@ public class SupabaseStorageService : ISupabaseStorageService
         if (string.IsNullOrWhiteSpace(_options.Url))
             missing.Add("Url");
 
-        if (string.IsNullOrWhiteSpace(_options.SecretKey))
+        if (string.IsNullOrWhiteSpace(Key))
             missing.Add("SecretKey");
 
         if (string.IsNullOrWhiteSpace(_options.Bucket))
@@ -57,11 +61,11 @@ public class SupabaseStorageService : ISupabaseStorageService
                 $" (server environment: {environment}).");
         }
 
-        var publicKind = GetPublicKeyKind(_options.SecretKey);
+        var publicKind = GetPublicKeyKind(Key);
 
         if (publicKind != null)
         {
-            var key = _options.SecretKey.Trim();
+            var key = Key;
 
             var environment =
                 Environment.GetEnvironmentVariable(
@@ -83,12 +87,13 @@ public class SupabaseStorageService : ISupabaseStorageService
     {
         var request = new HttpRequestMessage(method, url);
 
-        var key = _options.SecretKey.Trim();
+        var key = Key;
 
         request.Headers.TryAddWithoutValidation("apikey", key);
 
-        // Naye sb_secret_ keys JWT nahi hain: sirf apikey header me jaate hain.
-        // Purani (legacy) service_role JWT key Bearer me bhi jaati hai.
+        // Legacy service_role key (JWT, eyJ...): apikey + Bearer dono.
+        // Naya sb_secret_ key JWT nahi hai, use Bearer me bhejne par
+        // "Invalid Compact JWS" aata hai, isliye sirf apikey header.
         if (!key.StartsWith("sb_", StringComparison.Ordinal))
         {
             request.Headers.Authorization =
@@ -161,6 +166,25 @@ public class SupabaseStorageService : ISupabaseStorageService
         return body.Length > 150 ? body[..150] : body;
     }
 
+    // Supabase ke error ke saath saaf hint (key ka masla pehchaan kar)
+    private static string Describe(string body)
+    {
+        var reason = ReadReason(body);
+
+        if (reason.Contains("JWS", StringComparison.OrdinalIgnoreCase) ||
+            reason.Contains("authorization", StringComparison.OrdinalIgnoreCase) ||
+            reason.Contains("Invalid API key", StringComparison.OrdinalIgnoreCase) ||
+            reason.Contains("signature", StringComparison.OrdinalIgnoreCase))
+        {
+            reason +=
+                " | Fix: Supabase > Settings > API Keys > 'Legacy API Keys' " +
+                "tab se service_role key (eyJ... se shuru) copy karke " +
+                "Supabase__SecretKey me daalo.";
+        }
+
+        return reason;
+    }
+
     private static string EncodePath(string path) =>
         string.Join(
             "/",
@@ -204,7 +228,7 @@ public class SupabaseStorageService : ISupabaseStorageService
 
             throw new InvalidOperationException(
                 $"File upload failed ({(int)response.StatusCode}): " +
-                ReadReason(body));
+                Describe(body));
         }
     }
 
@@ -241,7 +265,7 @@ public class SupabaseStorageService : ISupabaseStorageService
 
             throw new InvalidOperationException(
                 $"File could not be opened ({(int)response.StatusCode}): " +
-                ReadReason(body));
+                Describe(body));
         }
 
         using var json = JsonDocument.Parse(body);

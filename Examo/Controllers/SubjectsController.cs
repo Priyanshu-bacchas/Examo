@@ -70,7 +70,9 @@ public class SubjectsController : ControllerBase
         return Ok(subject);
     }
 
+    // multipart/form-data: file (sirf PDF)
     [HttpPost("{id:int}/pdf")]
+    [RequestSizeLimit(12 * 1024 * 1024)]
     public async Task<IActionResult> UploadPdf(
         int id,
         IFormFile file)
