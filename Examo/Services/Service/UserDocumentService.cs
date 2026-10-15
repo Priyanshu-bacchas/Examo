@@ -131,6 +131,45 @@ public class UserDocumentService : IUserDocumentService
             document.StoragePath);
     }
 
+    public async Task<string?> GetDownloadUrlAsync(int id)
+    {
+        var document = await _repository.GetByIdAsync(id);
+
+        if (document == null)
+            return null;
+
+        return await _storage.CreateSignedUrlAsync(
+            document.StoragePath,
+            600,
+            BuildDownloadName(document));
+    }
+
+    public async Task<UserDocument?> RenameAsync(int id, string name)
+    {
+        var newName = (name ?? string.Empty).Trim();
+
+        if (string.IsNullOrWhiteSpace(newName))
+        {
+            throw new ArgumentException(
+                "Name is required.");
+        }
+
+        if (newName.Length > 150)
+        {
+            throw new ArgumentException(
+                "Name is too long. Maximum is 150 characters.");
+        }
+
+        var document = await _repository.GetByIdAsync(id);
+
+        if (document == null)
+            return null;
+
+        document.Name = newName;
+
+        return await _repository.UpdateAsync(document);
+    }
+
     public async Task<bool> DeleteAsync(int id)
     {
         var document = await _repository.GetByIdAsync(id);
@@ -148,6 +187,27 @@ public class UserDocumentService : IUserDocumentService
         }
 
         return deleted;
+    }
+
+    // Download ka naam: "<document name>.<original extension>"
+    private static string BuildDownloadName(UserDocument document)
+    {
+        var extension = Path.GetExtension(document.FileName);
+
+        var baseName = new string(
+            document.Name
+                .Where(c => !Path.GetInvalidFileNameChars().Contains(c))
+                .ToArray())
+            .Trim();
+
+        if (string.IsNullOrWhiteSpace(baseName))
+            return document.FileName;
+
+        return baseName.EndsWith(
+                   extension,
+                   StringComparison.OrdinalIgnoreCase)
+            ? baseName
+            : baseName + extension;
     }
 
     // File ke shuruaati bytes check karta hai (PDF / JPG / PNG / WEBP)

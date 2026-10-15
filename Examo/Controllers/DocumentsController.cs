@@ -87,6 +87,59 @@ public class DocumentsController : ControllerBase
         }
     }
 
+    // File download karne ke liye temporary (10 minute) link
+    [HttpGet("{id:int}/download-url")]
+    public async Task<IActionResult> GetDownloadUrl(int id)
+    {
+        try
+        {
+            var url = await _service.GetDownloadUrlAsync(id);
+
+            if (url == null)
+            {
+                return NotFound(new
+                {
+                    message = "Document not found."
+                });
+            }
+
+            return Ok(new { url });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new { message = ex.Message });
+        }
+    }
+
+    // Edit: document ka naam badalna  (body: { "name": "New name" })
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(
+        int id,
+        [FromBody] DocumentUpdateDto dto)
+    {
+        try
+        {
+            var document =
+                await _service.RenameAsync(id, dto.Name);
+
+            if (document == null)
+            {
+                return NotFound(new
+                {
+                    message = "Document not found."
+                });
+            }
+
+            return Ok(DocumentResponseDto.From(document));
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
