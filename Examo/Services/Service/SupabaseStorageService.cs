@@ -235,6 +235,7 @@ public class SupabaseStorageService : ISupabaseStorageService
     public async Task<string> CreateSignedUrlAsync(
         string path,
         int expiresInSeconds = 600,
+        string? downloadFileName = null,
         CancellationToken cancellationToken = default)
     {
         EnsureConfigured();
@@ -275,16 +276,31 @@ public class SupabaseStorageService : ISupabaseStorageService
                 .GetProperty("signedURL")
                 .GetString() ?? string.Empty;
 
+        string full;
+
         if (signed.StartsWith("http", StringComparison.OrdinalIgnoreCase))
-            return signed;
+        {
+            full = signed;
+        }
+        else if (signed.StartsWith("/storage/v1", StringComparison.Ordinal))
+        {
+            full = _options.Url.TrimEnd('/') + signed;
+        }
+        else
+        {
+            full = BaseUrl +
+                   (signed.StartsWith("/") ? signed : "/" + signed);
+        }
 
-        var root = _options.Url.TrimEnd('/');
+        // Download link: Supabase file ko attachment ki tarah bhejta hai
+        if (!string.IsNullOrWhiteSpace(downloadFileName))
+        {
+            full += (full.Contains('?') ? "&" : "?") +
+                    "download=" +
+                    Uri.EscapeDataString(downloadFileName);
+        }
 
-        if (signed.StartsWith("/storage/v1", StringComparison.Ordinal))
-            return root + signed;
-
-        return BaseUrl +
-               (signed.StartsWith("/") ? signed : "/" + signed);
+        return full;
     }
 
     public async Task DeleteAsync(
