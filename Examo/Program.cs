@@ -137,6 +137,36 @@ builder.Services.AddScoped<IExamFormService, ExamFormService>();
 builder.Services.AddScoped<IExamService, ExamService>();
 builder.Services.AddScoped<IPreparationService, PreparationService>();
 builder.Services.AddScoped<IExamResultService, ExamResultService>();
+
+// Supabase Storage (Subjects PDF + Documents)
+builder.Services.Configure<SupabaseOptions>(
+    builder.Configuration.GetSection("Supabase"));
+
+// Backup: agar Supabase:* na mile to SUPABASE_URL / SUPABASE_SECRET_KEY /
+// SUPABASE_BUCKET environment variables bhi chalenge
+builder.Services.PostConfigure<SupabaseOptions>(options =>
+{
+    if (string.IsNullOrWhiteSpace(options.Url))
+        options.Url =
+            Environment.GetEnvironmentVariable("SUPABASE_URL") ?? "";
+
+    if (string.IsNullOrWhiteSpace(options.SecretKey))
+        options.SecretKey =
+            Environment.GetEnvironmentVariable("SUPABASE_SECRET_KEY") ?? "";
+
+    var bucket = Environment.GetEnvironmentVariable("SUPABASE_BUCKET");
+
+    if (!string.IsNullOrWhiteSpace(bucket) &&
+        string.IsNullOrWhiteSpace(options.Bucket))
+        options.Bucket = bucket;
+});
+
+builder.Services.AddHttpClient<
+    ISupabaseStorageService,
+    SupabaseStorageService>();
+
+builder.Services.AddScoped<IUserDocumentRepository, UserDocumentRepository>();
+builder.Services.AddScoped<IUserDocumentService, UserDocumentService>();
 builder.Services.AddScoped<ISubjectService, SubjectService>();
 builder.Services.AddScoped<IScheduleService, ScheduleService>();
 

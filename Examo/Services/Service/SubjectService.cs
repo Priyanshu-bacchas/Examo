@@ -8,15 +8,20 @@ namespace Examo.Services;
 
 public class SubjectService : ISubjectService
 {
+    private const long MaxPdfBytes = 10 * 1024 * 1024; // 10 MB
+
     private readonly ISubjectRepository _repository;
-    private readonly IWebHostEnvironment _environment;
+    private readonly ISupabaseStorageService _storage;
+    private readonly ICurrentUserService _currentUser;
 
     public SubjectService(
         ISubjectRepository repository,
-        IWebHostEnvironment environment)
+        ISupabaseStorageService storage,
+        ICurrentUserService currentUser)
     {
         _repository = repository;
-        _environment = environment;
+        _storage = storage;
+        _currentUser = currentUser;
     }
 
     public async Task<IEnumerable<Subject>> GetAllAsync()
@@ -31,13 +36,13 @@ public class SubjectService : ISubjectService
 
     public async Task<Subject> AddAsync(SubjectCreateDto dto)
     {
+        // Pdf sirf upload endpoint se set hota hai (client ka path nahi mante)
         var subject = new Subject
         {
             SubjectName = dto.SubjectName,
             Status = dto.Status,
             Materials = dto.Materials,
             Lectures = dto.Lectures,
-            Pdf = dto.Pdf,
             Link = dto.Link
         };
 
@@ -59,8 +64,9 @@ public class SubjectService : ISubjectService
         subject.Status = dto.Status;
         subject.Materials = dto.Materials;
         subject.Lectures = dto.Lectures;
-        subject.Pdf = dto.Pdf;
         subject.Link = dto.Link;
+
+        // Pdf yahan nahi badalta: edit karne par PDF link gayab nahi hota
 
         return await _repository.UpdateAsync(subject);
     }
@@ -96,37 +102,99 @@ public class SubjectService : ISubjectService
                 "Only PDF files are allowed.");
         }
 
-        var uploadFolder = Path.Combine(
-            _environment.ContentRootPath,
-            "UploadedFiles",
-            "Subjects");
-
-        Directory.CreateDirectory(uploadFolder);
-
-        var uniqueFileName =
-            $"{Guid.NewGuid():N}.pdf";
-
-        var physicalFilePath = Path.Combine(
-            uploadFolder,
-            uniqueFileName);
-
-        await using (var stream = new FileStream(
-            physicalFilePath,
-            FileMode.Create))
+        if (file.Length > MaxPdfBytes)
         {
-            await file.CopyToAsync(stream);
+            throw new ArgumentException(
+                "PDF is too large. Maximum size is 10 MB.");
         }
 
-        var relativePath =
-            $"/UploadedFiles/Subjects/{uniqueFileName}";
+        var path =
+            $"users/{_currentUser.UserId}/subjects/{subject.Id}/" +
+            $"{Guid.NewGuid():N}.pdf";
 
-        subject.Pdf = relativePath;
+        await using (var stream = file.OpenReadStream())
+        {
+            await _storage.UploadAsync(
+                path,
+                stream,
+                "application/pdf");
+        }
 
-        return await _repository.UpdateAsync(subject);
+        var oldPath = subject.Pdf;
+
+        subject.Pdf = path;
+
+        Subject updated;
+
+        try
+        {
+            updated = await _repository.UpdateAsync(subject);
+        }
+        catch
+        {
+            await _storage.DeleteAsync(path);
+            throw;
+        }
+
+        // Purani PDF Supabase se hata do (purane local path ko chhod do)
+        if (IsStoragePath(oldPath))
+        {
+            await _storage.DeleteAsync(oldPath!);
+        }
+
+        return updated;
+    }
+
+    public async Task<string?> GetPdfUrlAsync(int id)
+    {
+        var subject = await _repository.GetByIdAsync(id);
+
+        if (subject == null)
+        {
+            return null;
+        }
+
+        if (string.IsNullOrWhiteSpace(subject.Pdf))
+        {
+            throw new ArgumentException(
+                "No PDF uploaded for this subject.");
+        }
+
+        // Sirf is user ke apne folder ki file ka link banta hai
+        if (!subject.Pdf.StartsWith(
+                $"users/{_currentUser.UserId}/",
+                StringComparison.Ordinal))
+        {
+            throw new ArgumentException(
+                "This PDF is no longer available. " +
+                "Please upload it again.");
+        }
+
+        return await _storage.CreateSignedUrlAsync(subject.Pdf);
     }
 
     public async Task<bool> DeleteAsync(int id)
     {
-        return await _repository.DeleteAsync(id);
+        var subject = await _repository.GetByIdAsync(id);
+
+        if (subject == null)
+        {
+            return false;
+        }
+
+        var pdfPath = subject.Pdf;
+
+        var deleted = await _repository.DeleteAsync(id);
+
+        if (deleted && IsStoragePath(pdfPath))
+        {
+            await _storage.DeleteAsync(pdfPath!);
+        }
+
+        return deleted;
     }
+
+    private static bool IsStoragePath(string? path) =>
+        !string.IsNullOrWhiteSpace(path) &&
+        path.StartsWith("users/", StringComparison.Ordinal);
 }

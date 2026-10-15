@@ -30,6 +30,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<ExamResult> Results { get; set; }
 
+    public virtual DbSet<UserDocument> Documents { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -253,6 +255,41 @@ public partial class ExamoDbContext : DbContext
                 .HasMaxLength(50)
                 .IsRequired()
                 .HasDefaultValue("Awaited");
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // DOCUMENTS (photo / pdf, file Supabase me)
+        // =========================
+
+        modelBuilder.Entity<UserDocument>(entity =>
+        {
+            entity.ToTable("Documents");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(e => e.FileName)
+                .HasMaxLength(255)
+                .IsRequired();
+
+            entity.Property(e => e.StoragePath)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.ContentType)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Kind)
+                .HasMaxLength(20)
+                .IsRequired();
 
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(

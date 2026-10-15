@@ -104,6 +104,52 @@ public class SubjectsController : ControllerBase
                 Message = ex.Message
             });
         }
+        catch (InvalidOperationException ex)
+        {
+            // Storage (Supabase) ki dikkat
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    Message = ex.Message
+                });
+        }
+    }
+
+    // PDF kholne ke liye temporary (10 minute) link
+    [HttpGet("{id:int}/pdf-url")]
+    public async Task<IActionResult> GetPdfUrl(int id)
+    {
+        try
+        {
+            var url = await _service.GetPdfUrlAsync(id);
+
+            if (url == null)
+            {
+                return NotFound(new
+                {
+                    Message = "Subject not found."
+                });
+            }
+
+            return Ok(new { url });
+        }
+        catch (ArgumentException ex)
+        {
+            return NotFound(new
+            {
+                Message = ex.Message
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status502BadGateway,
+                new
+                {
+                    Message = ex.Message
+                });
+        }
     }
 
     [HttpDelete("{id:int}")]

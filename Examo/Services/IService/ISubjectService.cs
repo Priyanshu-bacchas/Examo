@@ -20,5 +20,8 @@ public interface ISubjectService
         int id,
         IFormFile file);
 
+    // PDF kholne ka temporary link (sirf owner ke liye)
+    Task<string?> GetPdfUrlAsync(int id);
+
     Task<bool> DeleteAsync(int id);
 }
