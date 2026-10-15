@@ -59,11 +59,20 @@ public class UserDocumentService : IUserDocumentService
 
         var extension = Path.GetExtension(file.FileName);
 
+        // ContentType extension se tay hota hai (client ka ContentType
+        // kabhi galat aata hai), asli check neeche signature se.
         if (string.IsNullOrEmpty(extension) ||
             !Allowed.TryGetValue(extension, out var contentType))
         {
             throw new ArgumentException(
                 "Only photos (JPG, PNG, WEBP) and PDF files are allowed.");
+        }
+
+        if (!await MatchesSignatureAsync(file, contentType))
+        {
+            throw new ArgumentException(
+                "File content does not match its type. " +
+                "Please select a valid photo or PDF.");
         }
 
         var originalName = Path.GetFileName(file.FileName);
@@ -139,5 +148,59 @@ public class UserDocumentService : IUserDocumentService
         }
 
         return deleted;
+    }
+
+    // File ke shuruaati bytes check karta hai (PDF / JPG / PNG / WEBP)
+    private static async Task<bool> MatchesSignatureAsync(
+        IFormFile file,
+        string contentType)
+    {
+        var header = new byte[12];
+
+        await using var stream = file.OpenReadStream();
+
+        var read = 0;
+
+        while (read < header.Length)
+        {
+            var n = await stream.ReadAsync(
+                header.AsMemory(read, header.Length - read));
+
+            if (n == 0)
+                break;
+
+            read += n;
+        }
+
+        switch (contentType)
+        {
+            case "application/pdf":
+                return read >= 5 &&
+                       header[0] == 0x25 && header[1] == 0x50 &&
+                       header[2] == 0x44 && header[3] == 0x46 &&
+                       header[4] == 0x2D;
+
+            case "image/jpeg":
+                return read >= 3 &&
+                       header[0] == 0xFF && header[1] == 0xD8 &&
+                       header[2] == 0xFF;
+
+            case "image/png":
+                return read >= 8 &&
+                       header[0] == 0x89 && header[1] == 0x50 &&
+                       header[2] == 0x4E && header[3] == 0x47 &&
+                       header[4] == 0x0D && header[5] == 0x0A &&
+                       header[6] == 0x1A && header[7] == 0x0A;
+
+            case "image/webp":
+                return read >= 12 &&
+                       header[0] == 0x52 && header[1] == 0x49 &&
+                       header[2] == 0x46 && header[3] == 0x46 &&
+                       header[8] == 0x57 && header[9] == 0x45 &&
+                       header[10] == 0x42 && header[11] == 0x50;
+
+            default:
+                return false;
+        }
     }
 }

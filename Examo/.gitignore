@@ -17,3 +17,7 @@ UploadedFiles/
 
 node_modules/
 dist/
+
+*.zip
+Examo/UploadedFiles/
+Examo/appsettings.Development.json
