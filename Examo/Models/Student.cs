@@ -27,4 +27,25 @@ public class Student
     public bool IsBlocked { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    // =====================================================
+    // EMAIL OTP (verification + forgot password)
+    // =====================================================
+
+    // Default TRUE: admin-created / Google / purane users verified maane jaate hain.
+    // Sirf public Register me false set hota hai.
+    public bool EmailVerified { get; set; } = true;
+
+    // OTP ka HMAC hash (plain OTP kabhi DB me nahi jaata)
+    [JsonIgnore]
+    public string? OtpHash { get; set; }
+
+    [JsonIgnore]
+    public DateTime? OtpExpiresAt { get; set; }
+
+    [JsonIgnore]
+    public int OtpAttempts { get; set; }
+
+    [JsonIgnore]
+    public DateTime? OtpSentAt { get; set; }
 }

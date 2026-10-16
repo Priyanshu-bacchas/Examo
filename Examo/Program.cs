@@ -130,6 +130,12 @@ builder.Services.AddSingleton<SystemMetricsService>();
 builder.Services.AddHostedService(sp =>
     sp.GetRequiredService<SystemMetricsService>());
 
+// Resend (email OTP)
+builder.Services.Configure<ResendOptions>(
+    builder.Configuration.GetSection("Resend"));
+
+builder.Services.AddHttpClient<IEmailService, ResendEmailService>();
+
 builder.Services.AddScoped<IAuthService, AuthService>();
 
 builder.Services.AddScoped<IStudentService, StudentService>();

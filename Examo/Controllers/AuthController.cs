@@ -1,4 +1,5 @@
 ﻿using Examo.DTOs.Auth;
+using Examo.Services;
 using Examo.Services.Interfaces;
 
 using Microsoft.AspNetCore.Authorization;
@@ -20,7 +21,7 @@ public class AuthController : ControllerBase
     }
 
     // =====================================================
-    // REGISTER
+    // REGISTER  ->  OTP email jaata hai (token nahi milta)
     // =====================================================
 
     [HttpPost("register")]
@@ -43,6 +44,57 @@ public class AuthController : ControllerBase
             {
                 message = ex.Message
             });
+        }
+    }
+
+    // =====================================================
+    // VERIFY EMAIL (signup OTP)  ->  token milta hai
+    // =====================================================
+
+    [HttpPost("verify-email")]
+    public async Task<IActionResult> VerifyEmail(
+        [FromBody] VerifyEmailDto dto)
+    {
+        try
+        {
+            var result =
+                await _authService
+                    .VerifyEmailAsync(dto);
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // =====================================================
+    // RESEND OTP (signup verification)
+    // =====================================================
+
+    [HttpPost("resend-otp")]
+    public async Task<IActionResult> ResendOtp(
+        [FromBody] ResendOtpDto dto)
+    {
+        try
+        {
+            await _authService.ResendOtpAsync(dto);
+
+            return Ok(new
+            {
+                message = "If the account exists, a new code has been sent."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 
@@ -71,6 +123,18 @@ public class AuthController : ControllerBase
 
             return Ok(result);
         }
+        catch (EmailNotVerifiedException ex)
+        {
+            // Frontend isse OTP screen par le jaata hai
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    code = "EMAIL_NOT_VERIFIED",
+                    email = ex.Email,
+                    message = ex.Message
+                });
+        }
         catch (UnauthorizedAccessException ex)
         {
             // Blocked account
@@ -80,6 +144,57 @@ public class AuthController : ControllerBase
                 {
                     message = ex.Message
                 });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // =====================================================
+    // FORGOT PASSWORD (hamesha same response - email leak nahi)
+    // =====================================================
+
+    [HttpPost("forgot-password")]
+    public async Task<IActionResult> ForgotPassword(
+        [FromBody] ForgotPasswordDto dto)
+    {
+        try
+        {
+            await _authService.ForgotPasswordAsync(dto);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+
+        return Ok(new
+        {
+            message =
+                "If an account exists for this email, a reset code has been sent."
+        });
+    }
+
+    // =====================================================
+    // RESET PASSWORD (OTP + new password)
+    // =====================================================
+
+    [HttpPost("reset-password")]
+    public async Task<IActionResult> ResetPassword(
+        [FromBody] ResetPasswordWithOtpDto dto)
+    {
+        try
+        {
+            await _authService.ResetPasswordAsync(dto);
+
+            return Ok(new
+            {
+                message = "Password updated. You can log in now."
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
         }
     }
 

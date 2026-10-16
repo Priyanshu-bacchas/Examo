@@ -4,7 +4,13 @@ namespace Examo.Services.Interfaces;
 
 public interface IAuthService
 {
-    Task<AuthResponseDto> RegisterAsync(RegisterDto dto);
+    Task<RegisterResultDto> RegisterAsync(RegisterDto dto);
+    Task<AuthResponseDto> VerifyEmailAsync(VerifyEmailDto dto);
+    Task ResendOtpAsync(ResendOtpDto dto);
+
     Task<AuthResponseDto?> LoginAsync(LoginDto dto);
     Task<AuthResponseDto> FirebaseLoginAsync(FirebaseAuthDto dto);
+
+    Task ForgotPasswordAsync(ForgotPasswordDto dto);
+    Task ResetPasswordAsync(ResetPasswordWithOtpDto dto);
 }
