@@ -23,26 +23,37 @@ public class AuthService : IAuthService
         "Your account has been blocked. Please contact the admin.";
 
     private readonly IActivityLogService _activityLog;
+    private readonly IEmailService _emailService;
     private readonly PasswordHasher<Student> _passwordHasher;
+
+    // OTP rules
+    private const int OtpValidMinutes = 10;
+    private const int MaxOtpAttempts = 5;
+    private const int ResendCooldownSeconds = 60;
+
+    private const string PurposeVerify = "verify";
+    private const string PurposeReset = "reset";
 
     public AuthService(
         IStudentRepository studentRepository,
         IConfiguration configuration,
-        IActivityLogService activityLog)
+        IActivityLogService activityLog,
+        IEmailService emailService)
     {
         _studentRepository = studentRepository;
         _configuration = configuration;
         _activityLog = activityLog;
+        _emailService = emailService;
 
         _passwordHasher =
             new PasswordHasher<Student>();
     }
 
     // =========================
-    // REGISTER
+    // REGISTER  (account banta hai, par OTP verify hone tak login nahi)
     // =========================
 
-    public async Task<AuthResponseDto> RegisterAsync(
+    public async Task<RegisterResultDto> RegisterAsync(
         RegisterDto dto)
     {
         var fullName =
@@ -70,51 +81,140 @@ public class AuthService : IAuthService
             throw new InvalidOperationException(
                 "Password is required.");
 
-        if (await _studentRepository.EmailExistsAsync(email))
+        var existing =
+            await _studentRepository.GetByEmailAsync(email);
+
+        // Verified account pehle se hai -> block
+        if (existing != null && existing.EmailVerified)
         {
             throw new InvalidOperationException(
                 "An account with this email already exists.");
         }
 
-        if (await _studentRepository.MobileExistsAsync(mobile))
+        Student student;
+
+        if (existing != null)
         {
-            throw new InvalidOperationException(
-                "An account with this mobile number already exists.");
+            // Pehle signup shuru kiya tha par OTP verify nahi kiya:
+            // details update karke naya OTP bhejo (user atkega nahi).
+            if (await _studentRepository
+                .MobileExistsAsync(mobile, existing.Id))
+            {
+                throw new InvalidOperationException(
+                    "An account with this mobile number already exists.");
+            }
+
+            existing.Name = fullName;
+            existing.MobileNumber = mobile;
+            existing.Password = dto.Password;
+            existing.PasswordHash = string.Empty;
+
+            student = existing;
+        }
+        else
+        {
+            if (await _studentRepository.MobileExistsAsync(mobile))
+            {
+                throw new InvalidOperationException(
+                    "An account with this mobile number already exists.");
+            }
+
+            student = new Student
+            {
+                Name = fullName,
+                MobileNumber = mobile,
+                Email = email,
+
+                // Public registration is always Student.
+                Role = "Student",
+
+                CreatedAt = DateTime.UtcNow,
+
+                // Login password (StudentService jaisa hi: plain, hash nahi)
+                Password = dto.Password,
+
+                PasswordHash = string.Empty,
+
+                // OTP verify hone tak false
+                EmailVerified = false
+            };
+
+            student = await _studentRepository.AddAsync(student);
         }
 
-        var student = new Student
-        {
-            Name = fullName,
-            MobileNumber = mobile,
-            Email = email,
-
-            // Public registration is always Student.
-            Role = "Student",
-
-            CreatedAt = DateTime.UtcNow,
-
-            // Login password (StudentService jaisa hi: plain, hash nahi)
-            Password = dto.Password,
-
-            PasswordHash = string.Empty
-        };
-
-        var savedStudent =
-            await _studentRepository.AddAsync(student);
+        await IssueOtpAsync(student, PurposeVerify);
 
         await _activityLog.LogAsync(
             "Register",
-            "New account created",
-            savedStudent.Id,
-            savedStudent.Name,
-            savedStudent.Email,
-            savedStudent.Role);
+            "Account created, verification code sent",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
+
+        return new RegisterResultDto
+        {
+            RequiresVerification = true,
+            Email = student.Email,
+            Message = "We have sent a 6-digit code to your email."
+        };
+    }
+
+    // =========================
+    // VERIFY EMAIL  (OTP sahi -> verified + login token)
+    // =========================
+
+    public async Task<AuthResponseDto> VerifyEmailAsync(
+        VerifyEmailDto dto)
+    {
+        var student =
+            await ConsumeOtpAsync(
+                dto.Email,
+                dto.Otp,
+                PurposeVerify);
+
+        if (student.IsBlocked)
+            throw new UnauthorizedAccessException(BlockedMessage);
+
+        student.EmailVerified = true;
+
+        await _studentRepository.UpdateAsync(student);
+
+        await _activityLog.LogAsync(
+            "Email Verified",
+            "Email verified with OTP",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
 
         return new AuthResponseDto
         {
-            Token = GenerateToken(savedStudent),
-            User = MapStudent(savedStudent)
+            Token = GenerateToken(student),
+            User = MapStudent(student)
         };
+    }
+
+    // =========================
+    // RESEND OTP  (sirf unverified accounts ke liye)
+    // =========================
+
+    public async Task ResendOtpAsync(ResendOtpDto dto)
+    {
+        var student =
+            await _studentRepository
+                .GetByEmailAsync(dto.Email);
+
+        // Account na ho / pehle se verified ho -> chup-chaap return
+        // (taaki koi email check na kar sake)
+        if (student == null ||
+            student.EmailVerified ||
+            student.IsBlocked)
+        {
+            return;
+        }
+
+        await IssueOtpAsync(student, PurposeVerify);
     }
 
     // =========================
@@ -174,6 +274,21 @@ public class AuthService : IAuthService
                 BlockedMessage);
         }
 
+        // Email verify nahi hui -> naya OTP bhejo, frontend OTP screen dikhayega
+        if (!student.EmailVerified)
+        {
+            try
+            {
+                await IssueOtpAsync(student, PurposeVerify);
+            }
+            catch (InvalidOperationException)
+            {
+                // Cooldown chal raha hai: pehle wala OTP abhi valid hai
+            }
+
+            throw new EmailNotVerifiedException(student.Email);
+        }
+
         await _activityLog.LogAsync(
             "Login",
             "Logged in with password",
@@ -187,6 +302,72 @@ public class AuthService : IAuthService
             Token = GenerateToken(student),
             User = MapStudent(student)
         };
+    }
+
+    // =========================
+    // FORGOT PASSWORD  (OTP email par)
+    // =========================
+
+    public async Task ForgotPasswordAsync(
+        ForgotPasswordDto dto)
+    {
+        var student =
+            await _studentRepository
+                .GetByEmailAsync(dto.Email);
+
+        // Account na ho / blocked ho -> chup-chaap return (same response)
+        if (student == null || student.IsBlocked)
+            return;
+
+        try
+        {
+            await IssueOtpAsync(student, PurposeReset);
+        }
+        catch (InvalidOperationException ex)
+            when (ex.Message.StartsWith("Please wait"))
+        {
+            // Cooldown: dobara mail nahi bhejni, response same rahega
+            return;
+        }
+
+        await _activityLog.LogAsync(
+            "Forgot Password",
+            "Password reset code requested",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
+    }
+
+    // =========================
+    // RESET PASSWORD  (OTP + naya password)
+    // =========================
+
+    public async Task ResetPasswordAsync(
+        ResetPasswordWithOtpDto dto)
+    {
+        var student =
+            await ConsumeOtpAsync(
+                dto.Email,
+                dto.Otp,
+                PurposeReset);
+
+        // Project ka existing system: plain Password column
+        student.Password = dto.NewPassword;
+        student.PasswordHash = string.Empty;
+
+        // OTP email par aaya = email ownership prove ho gayi
+        student.EmailVerified = true;
+
+        await _studentRepository.UpdateAsync(student);
+
+        await _activityLog.LogAsync(
+            "Reset Password",
+            "Password changed with email code",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
     }
 
     // =========================
@@ -329,6 +510,16 @@ public class AuthService : IAuthService
             }
         }
 
+        // Google ne email verify ki hui hoti hai
+        if (!student.EmailVerified)
+        {
+            student.EmailVerified = true;
+
+            student =
+                await _studentRepository
+                    .UpdateAsync(student);
+        }
+
         if (student.IsBlocked)
         {
             await _activityLog.LogAsync(
@@ -392,6 +583,128 @@ public class AuthService : IAuthService
         {
             return false;
         }
+    }
+
+    // =========================
+    // OTP HELPERS
+    // =========================
+
+    // Purpose hash me mila diya hai: signup ka OTP password-reset me nahi chalega.
+    private string HashOtp(
+        string purpose,
+        Student student,
+        string otp)
+    {
+        var jwtKey =
+            _configuration["Jwt:Key"]
+            ?? throw new InvalidOperationException(
+                "Jwt:Key is missing from configuration.");
+
+        using var hmac =
+            new HMACSHA256(Encoding.UTF8.GetBytes(jwtKey));
+
+        var hash =
+            hmac.ComputeHash(
+                Encoding.UTF8.GetBytes(
+                    $"{purpose}:{student.Id}:{otp}"));
+
+        return Convert.ToHexString(hash);
+    }
+
+    private async Task IssueOtpAsync(
+        Student student,
+        string purpose)
+    {
+        if (student.OtpSentAt.HasValue)
+        {
+            var elapsed =
+                (DateTime.UtcNow - student.OtpSentAt.Value)
+                    .TotalSeconds;
+
+            if (elapsed < ResendCooldownSeconds)
+            {
+                var wait =
+                    (int)Math.Ceiling(ResendCooldownSeconds - elapsed);
+
+                throw new InvalidOperationException(
+                    $"Please wait {wait}s before requesting another code.");
+            }
+        }
+
+        var otp =
+            RandomNumberGenerator
+                .GetInt32(0, 1_000_000)
+                .ToString("D6");
+
+        student.OtpHash = HashOtp(purpose, student, otp);
+        student.OtpExpiresAt =
+            DateTime.UtcNow.AddMinutes(OtpValidMinutes);
+        student.OtpAttempts = 0;
+        student.OtpSentAt = DateTime.UtcNow;
+
+        await _studentRepository.UpdateAsync(student);
+
+        await _emailService.SendOtpAsync(
+            student.Email,
+            student.Name,
+            otp,
+            purpose);
+    }
+
+    // OTP check karta hai. Sahi ho to OTP delete karke student return karta hai.
+    private async Task<Student> ConsumeOtpAsync(
+        string email,
+        string otp,
+        string purpose)
+    {
+        const string invalid = "Invalid or expired code.";
+
+        var student =
+            await _studentRepository
+                .GetByEmailAsync(email);
+
+        if (student == null ||
+            string.IsNullOrEmpty(student.OtpHash) ||
+            !student.OtpExpiresAt.HasValue)
+        {
+            throw new InvalidOperationException(invalid);
+        }
+
+        if (student.OtpExpiresAt.Value < DateTime.UtcNow)
+        {
+            throw new InvalidOperationException(
+                "This code has expired. Please request a new one.");
+        }
+
+        if (student.OtpAttempts >= MaxOtpAttempts)
+        {
+            throw new InvalidOperationException(
+                "Too many wrong attempts. Please request a new code.");
+        }
+
+        var expected = HashOtp(purpose, student, otp.Trim());
+
+        var ok =
+            CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(expected),
+                Encoding.UTF8.GetBytes(student.OtpHash));
+
+        if (!ok)
+        {
+            student.OtpAttempts++;
+
+            await _studentRepository.UpdateAsync(student);
+
+            throw new InvalidOperationException(
+                "Incorrect code. Please try again.");
+        }
+
+        // One-time use
+        student.OtpHash = null;
+        student.OtpExpiresAt = null;
+        student.OtpAttempts = 0;
+
+        return student;
     }
 
     // =========================
