@@ -123,6 +123,18 @@ public class AuthController : ControllerBase
 
             return Ok(result);
         }
+        catch (LoginOtpRequiredException ex)
+        {
+            // Frontend isse login-OTP screen par le jaata hai
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new
+                {
+                    code = "LOGIN_OTP_REQUIRED",
+                    email = ex.Email,
+                    message = ex.Message
+                });
+        }
         catch (EmailNotVerifiedException ex)
         {
             // Frontend isse OTP screen par le jaata hai
@@ -144,6 +156,34 @@ public class AuthController : ControllerBase
                 {
                     message = ex.Message
                 });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    // =====================================================
+    // VERIFY LOGIN OTP  ->  token milta hai
+    // =====================================================
+
+    [HttpPost("verify-login-otp")]
+    public async Task<IActionResult> VerifyLoginOtp(
+        [FromBody] VerifyEmailDto dto)
+    {
+        try
+        {
+            var result =
+                await _authService
+                    .VerifyLoginOtpAsync(dto);
+
+            return Ok(result);
+        }
+        catch (UnauthorizedAccessException ex)
+        {
+            return StatusCode(
+                StatusCodes.Status403Forbidden,
+                new { message = ex.Message });
         }
         catch (InvalidOperationException ex)
         {
