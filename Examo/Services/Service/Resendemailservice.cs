@@ -11,17 +11,23 @@ namespace Examo.Services;
 
 public class ResendOptions
 {
-    // Render env var:  Resend__ApiKey
+    // Render env var:  Resend__ApiKey   (ya RESEND_API_KEY bhi chalega)
     public string ApiKey { get; set; } = string.Empty;
 
-    // Render env var:  Resend__From     e.g.  Examo <no-reply@yourdomain.com>
-    public string From { get; set; } = "Examo <onboarding@resend.dev>";
+    // Render env var:  Resend__From     (ya RESEND_FROM bhi chalega)
+    // Khaali ho to neeche DefaultFrom use hota hai.
+    public string From { get; set; } = string.Empty;
 }
 
 public class ResendEmailService : IEmailService
 {
+    // Tumhara Resend-verified domain
+    private const string DefaultFrom =
+        "Examo <no-reply@examoaspirants.co.in>";
+
     private readonly HttpClient _http;
-    private readonly ResendOptions _options;
+    private readonly string _apiKey;
+    private readonly string _from;
     private readonly IHostEnvironment _env;
     private readonly ILogger<ResendEmailService> _logger;
 
@@ -32,9 +38,43 @@ public class ResendEmailService : IEmailService
         ILogger<ResendEmailService> logger)
     {
         _http = http;
-        _options = options.Value;
         _env = env;
         _logger = logger;
+
+        var o = options.Value;
+
+        _apiKey = FirstNonEmpty(
+            o.ApiKey,
+            Environment.GetEnvironmentVariable("RESEND_API_KEY"));
+
+        _from = FirstNonEmpty(
+            o.From,
+            Environment.GetEnvironmentVariable("RESEND_FROM"),
+            DefaultFrom);
+
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _logger.LogWarning(
+                "Resend API key is NOT configured. Emails will not be sent.");
+        }
+        else
+        {
+            _logger.LogInformation(
+                "Resend configured. From = {From}, key = {KeyStart}...",
+                _from,
+                _apiKey.Length >= 6 ? _apiKey[..6] : "?");
+        }
+    }
+
+    private static string FirstNonEmpty(params string?[] values)
+    {
+        foreach (var v in values)
+        {
+            if (!string.IsNullOrWhiteSpace(v))
+                return v.Trim();
+        }
+
+        return string.Empty;
     }
 
     public async Task SendOtpAsync(
@@ -44,21 +84,28 @@ public class ResendEmailService : IEmailService
         string purpose)
     {
         var isReset = purpose == "reset";
+        var isLogin = purpose == "login";
 
         var subject = isReset
-            ? "Examo password reset code"
-            : "Verify your Examo account";
+            ? "Your Examo password reset code"
+            : isLogin
+                ? "Your Examo login code"
+                : "Your Examo verification code";
 
         var heading = isReset
             ? "Reset your password"
-            : "Verify your email";
+            : isLogin
+                ? "Confirm your login"
+                : "Verify your email";
 
         var intro = isReset
             ? "Use this code to reset your Examo password."
-            : "Use this code to finish creating your Examo account.";
+            : isLogin
+                ? "Use this code to finish logging in to Examo."
+                : "Use this code to finish creating your Examo account.";
 
         // Local testing: API key nahi hai to OTP console me print karo
-        if (string.IsNullOrWhiteSpace(_options.ApiKey))
+        if (string.IsNullOrWhiteSpace(_apiKey))
         {
             if (_env.IsDevelopment())
             {
@@ -89,12 +136,19 @@ public class ResendEmailService : IEmailService
      If you did not request it, you can safely ignore this email.</p>
 </div>";
 
+        // Plain-text version: Gmail spam filter ke liye better
+        var text =
+            $"Hi {name},\n\n{intro}\n\nYour code: {otp}\n\n" +
+            "This code expires in 10 minutes. " +
+            "If you did not request it, you can ignore this email.\n\n- Examo";
+
         var payload = JsonSerializer.Serialize(new
         {
-            from = _options.From,
+            from = _from,
             to = new[] { toEmail },
             subject,
-            html
+            html,
+            text
         });
 
         using var request = new HttpRequestMessage(
@@ -102,7 +156,7 @@ public class ResendEmailService : IEmailService
             "https://api.resend.com/emails");
 
         request.Headers.Authorization =
-            new AuthenticationHeaderValue("Bearer", _options.ApiKey);
+            new AuthenticationHeaderValue("Bearer", _apiKey);
 
         // Resend bina User-Agent ke 403 deta hai
         request.Headers.UserAgent.ParseAdd("Examo/1.0");
@@ -124,17 +178,28 @@ public class ResendEmailService : IEmailService
                 "Could not send the email right now. Please try again.");
         }
 
+        var body = await response.Content.ReadAsStringAsync();
+
         if (!response.IsSuccessStatusCode)
         {
-            var body = await response.Content.ReadAsStringAsync();
-
             _logger.LogError(
-                "Resend rejected the email ({Status}): {Body}",
+                "Resend REJECTED email to {Email} ({Status}): {Body}",
+                toEmail,
                 (int)response.StatusCode,
                 body);
 
+            // Development me asli error screen par dikhao, production me generic
             throw new InvalidOperationException(
-                "Could not send the email right now. Please try again.");
+                _env.IsDevelopment()
+                    ? $"Resend error {(int)response.StatusCode}: {body}"
+                    : "Could not send the email right now. Please try again.");
         }
+
+        // Is id ko Resend dashboard > Emails me dhoondh sakte ho
+        _logger.LogInformation(
+            "Resend ACCEPTED email to {Email} from {From}: {Body}",
+            toEmail,
+            _from,
+            body);
     }
 }

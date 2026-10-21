@@ -9,6 +9,7 @@ public interface IAuthService
     Task ResendOtpAsync(ResendOtpDto dto);
 
     Task<AuthResponseDto?> LoginAsync(LoginDto dto);
+    Task<AuthResponseDto> VerifyLoginOtpAsync(VerifyEmailDto dto);
     Task<AuthResponseDto> FirebaseLoginAsync(FirebaseAuthDto dto);
 
     Task ForgotPasswordAsync(ForgotPasswordDto dto);

@@ -33,6 +33,7 @@ public class AuthService : IAuthService
 
     private const string PurposeVerify = "verify";
     private const string PurposeReset = "reset";
+    private const string PurposeLogin = "login";
 
     public AuthService(
         IStudentRepository studentRepository,
@@ -281,7 +282,8 @@ public class AuthService : IAuthService
             {
                 await IssueOtpAsync(student, PurposeVerify);
             }
-            catch (InvalidOperationException)
+            catch (InvalidOperationException ex)
+                when (ex.Message.StartsWith("Please wait"))
             {
                 // Cooldown chal raha hai: pehle wala OTP abhi valid hai
             }
@@ -289,9 +291,62 @@ public class AuthService : IAuthService
             throw new EmailNotVerifiedException(student.Email);
         }
 
+        // Har login par email OTP (Admin ko chhodkar, taaki lockout na ho).
+        // Band karna ho: env var  Auth__LoginOtp = false
+        var loginOtpOn =
+            _configuration.GetValue<bool?>("Auth:LoginOtp") ?? true;
+
+        if (loginOtpOn && student.Role != "Admin")
+        {
+            try
+            {
+                await IssueOtpAsync(student, PurposeLogin);
+            }
+            catch (InvalidOperationException ex)
+                when (ex.Message.StartsWith("Please wait"))
+            {
+                // Cooldown: pehle bheja gaya login code abhi valid hai
+            }
+
+            throw new LoginOtpRequiredException(student.Email);
+        }
+
         await _activityLog.LogAsync(
             "Login",
             "Logged in with password",
+            student.Id,
+            student.Name,
+            student.Email,
+            student.Role);
+
+        return new AuthResponseDto
+        {
+            Token = GenerateToken(student),
+            User = MapStudent(student)
+        };
+    }
+
+    // =========================
+    // VERIFY LOGIN OTP  (password + email code dono sahi -> token)
+    // =========================
+
+    public async Task<AuthResponseDto> VerifyLoginOtpAsync(
+        VerifyEmailDto dto)
+    {
+        var student =
+            await ConsumeOtpAsync(
+                dto.Email,
+                dto.Otp,
+                PurposeLogin);
+
+        if (student.IsBlocked)
+            throw new UnauthorizedAccessException(BlockedMessage);
+
+        await _studentRepository.UpdateAsync(student);
+
+        await _activityLog.LogAsync(
+            "Login",
+            "Logged in with password + email code",
             student.Id,
             student.Name,
             student.Email,
@@ -615,7 +670,13 @@ public class AuthService : IAuthService
         Student student,
         string purpose)
     {
-        if (student.OtpSentAt.HasValue)
+        // Cooldown sirf tab, jab SAME purpose ka code abhi pending ho.
+        // (Signup ke turant baad login karo to naya login code jaana chahiye.)
+        var samePurposePending =
+            !string.IsNullOrEmpty(student.OtpHash) &&
+            student.OtpHash.StartsWith(purpose + "|");
+
+        if (student.OtpSentAt.HasValue && samePurposePending)
         {
             var elapsed =
                 (DateTime.UtcNow - student.OtpSentAt.Value)
@@ -636,7 +697,7 @@ public class AuthService : IAuthService
                 .GetInt32(0, 1_000_000)
                 .ToString("D6");
 
-        student.OtpHash = HashOtp(purpose, student, otp);
+        student.OtpHash = purpose + "|" + HashOtp(purpose, student, otp);
         student.OtpExpiresAt =
             DateTime.UtcNow.AddMinutes(OtpValidMinutes);
         student.OtpAttempts = 0;
@@ -682,7 +743,7 @@ public class AuthService : IAuthService
                 "Too many wrong attempts. Please request a new code.");
         }
 
-        var expected = HashOtp(purpose, student, otp.Trim());
+        var expected = purpose + "|" + HashOtp(purpose, student, otp.Trim());
 
         var ok =
             CryptographicOperations.FixedTimeEquals(
