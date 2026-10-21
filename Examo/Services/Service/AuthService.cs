@@ -565,10 +565,17 @@ public class AuthService : IAuthService
             }
         }
 
-        // Google ne email verify ki hui hoti hai
+        // Google ne email verify ki hui hoti hai.
+        // Agar ye account pehle kisi ne is email se (bina verify kiye) bana
+        // rakha tha, to uska password hata do (pre-registration attack se bachav).
+        // User chahe to "Forgot Password" se apna password set kar sakta hai.
         if (!student.EmailVerified)
         {
             student.EmailVerified = true;
+            student.Password = string.Empty;
+            student.PasswordHash = string.Empty;
+            student.OtpHash = null;
+            student.OtpExpiresAt = null;
 
             student =
                 await _studentRepository
