@@ -41,17 +41,10 @@ public class FaqSearchResultDto
 }
 
 // Help > Contact Us form
+// Name aur Email yahan nahi hain: backend login user (JWT) ke account se khud leta hai,
+// isliye client kuch bhi bheje use ignore kiya jaata hai.
 public class ContactSupportDto
 {
-    [Required(ErrorMessage = "Name is required.")]
-    [StringLength(100, ErrorMessage = "Name can be at most 100 characters.")]
-    public string Name { get; set; } = string.Empty;
-
-    [Required(ErrorMessage = "Email address is required.")]
-    [EmailAddress(ErrorMessage = "Please enter a valid email address.")]
-    [StringLength(200, ErrorMessage = "Email can be at most 200 characters.")]
-    public string Email { get; set; } = string.Empty;
-
     [Required(ErrorMessage = "Subject is required.")]
     [StringLength(150, ErrorMessage = "Subject can be at most 150 characters.")]
     public string Subject { get; set; } = string.Empty;
@@ -88,6 +81,12 @@ public class SupportMessageDto
     public DateTime CreatedAt { get; set; }
 
     public DateTime? ResolvedAt { get; set; }
+
+    public string? AdminReply { get; set; }
+
+    public DateTime? RepliedAt { get; set; }
+
+    public string? RepliedBy { get; set; }
 }
 
 public class SupportMessageStatsDto
@@ -111,4 +110,16 @@ public class SupportMessageListDto
 public class UpdateSupportStatusDto
 {
     public string? Status { get; set; }
+}
+
+// Admin ka reply (email se student ko jaata hai)
+public class ReplySupportDto
+{
+    [Required(ErrorMessage = "Reply is required.")]
+    [StringLength(5000, MinimumLength = 2,
+        ErrorMessage = "Reply must be between 2 and 5000 characters.")]
+    public string Reply { get; set; } = string.Empty;
+
+    // Reply ke baad message ko Resolved mark karna hai ya nahi
+    public bool MarkResolved { get; set; } = true;
 }

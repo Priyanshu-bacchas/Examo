@@ -17,6 +17,11 @@ public class ResendOptions
     // Render env var:  Resend__From     (ya RESEND_FROM bhi chalega)
     // Khaali ho to neeche DefaultFrom use hota hai.
     public string From { get; set; } = string.Empty;
+
+    // Render env var:  Resend__ReplyTo  (ya RESEND_REPLY_TO bhi chalega)
+    // Support reply par student "Reply" dabaye to is address par aayega.
+    // Khaali ho to reply-to header nahi lagta (From no-reply hai).
+    public string ReplyTo { get; set; } = string.Empty;
 }
 
 public class ResendEmailService : IEmailService
@@ -28,6 +33,7 @@ public class ResendEmailService : IEmailService
     private readonly HttpClient _http;
     private readonly string _apiKey;
     private readonly string _from;
+    private readonly string _replyTo;
     private readonly IHostEnvironment _env;
     private readonly ILogger<ResendEmailService> _logger;
 
@@ -51,6 +57,10 @@ public class ResendEmailService : IEmailService
             o.From,
             Environment.GetEnvironmentVariable("RESEND_FROM"),
             DefaultFrom);
+
+        _replyTo = FirstNonEmpty(
+            o.ReplyTo,
+            Environment.GetEnvironmentVariable("RESEND_REPLY_TO"));
 
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
@@ -142,14 +152,97 @@ public class ResendEmailService : IEmailService
             "This code expires in 10 minutes. " +
             "If you did not request it, you can ignore this email.\n\n- Examo";
 
-        var payload = JsonSerializer.Serialize(new
-        {
-            from = _from,
-            to = new[] { toEmail },
-            subject,
+        await SendAsync(toEmail, subject, html, text, null);
+    }
+
+    // =====================================================
+    // SUPPORT REPLY (Admin > Help & Support)
+    // =====================================================
+    public async Task SendSupportReplyAsync(
+        string toEmail,
+        string name,
+        string subject,
+        string originalMessage,
+        string reply)
+    {
+        var mailSubject = subject.StartsWith(
+            "Re:",
+            StringComparison.OrdinalIgnoreCase)
+            ? subject
+            : $"Re: {subject}";
+
+        var safeName = WebUtility.HtmlEncode(name);
+
+        var safeReply = WebUtility.HtmlEncode(reply)
+            .Replace("\r\n", "\n")
+            .Replace("\n", "<br>");
+
+        var safeOriginal = WebUtility.HtmlEncode(originalMessage)
+            .Replace("\r\n", "\n")
+            .Replace("\n", "<br>");
+
+        var html = $@"
+<div style=""font-family:Arial,Helvetica,sans-serif;max-width:560px;margin:0 auto;padding:24px;"">
+  <p style=""color:#444;"">Hi {safeName},</p>
+  <div style=""color:#222;font-size:15px;line-height:1.65;"">{safeReply}</div>
+  <p style=""color:#444;margin-top:24px;"">Regards,<br>Examo Support</p>
+  <hr style=""border:none;border-top:1px solid #e5e7eb;margin:24px 0 14px;"">
+  <p style=""color:#888;font-size:12px;margin:0 0 6px;"">Your message:</p>
+  <div style=""color:#666;font-size:13px;line-height:1.6;border-left:3px solid #d1d5db;padding-left:12px;"">{safeOriginal}</div>
+</div>";
+
+        var text =
+            $"Hi {name},\n\n{reply}\n\nRegards,\nExamo Support\n\n" +
+            $"---- Your message ----\n{originalMessage}\n";
+
+        await SendAsync(
+            toEmail,
+            mailSubject,
             html,
-            text
-        });
+            text,
+            string.IsNullOrWhiteSpace(_replyTo) ? null : _replyTo);
+    }
+
+    // =====================================================
+    // COMMON: Resend API call
+    // =====================================================
+    private async Task SendAsync(
+        string toEmail,
+        string subject,
+        string html,
+        string text,
+        string? replyTo)
+    {
+        // Local testing: API key nahi hai to console me log karo
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            if (_env.IsDevelopment())
+            {
+                _logger.LogWarning(
+                    "RESEND API KEY MISSING (dev mode). Email to {Email}, subject: {Subject}",
+                    toEmail,
+                    subject);
+
+                return;
+            }
+
+            throw new InvalidOperationException(
+                "Email service is not configured.");
+        }
+
+        var data = new Dictionary<string, object>
+        {
+            ["from"] = _from,
+            ["to"] = new[] { toEmail },
+            ["subject"] = subject,
+            ["html"] = html,
+            ["text"] = text
+        };
+
+        if (!string.IsNullOrWhiteSpace(replyTo))
+            data["reply_to"] = replyTo;
+
+        var payload = JsonSerializer.Serialize(data);
 
         using var request = new HttpRequestMessage(
             HttpMethod.Post,

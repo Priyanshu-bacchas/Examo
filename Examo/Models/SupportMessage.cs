@@ -22,4 +22,12 @@ public class SupportMessage
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
     public DateTime? ResolvedAt { get; set; }
+
+    // Admin ka bheja hua (latest) reply, email se student ko gaya
+    public string? AdminReply { get; set; }
+
+    public DateTime? RepliedAt { get; set; }
+
+    // Kis admin ne reply kiya (naam)
+    public string? RepliedBy { get; set; }
 }
