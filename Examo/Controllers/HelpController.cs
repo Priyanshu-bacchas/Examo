@@ -27,15 +27,18 @@ public class HelpController : ControllerBase
     private readonly ExamoDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IMemoryCache _cache;
+    private readonly IEmailService _emailService;
 
     public HelpController(
         ExamoDbContext context,
         ICurrentUserService currentUser,
-        IMemoryCache cache)
+        IMemoryCache cache,
+        IEmailService emailService)
     {
         _context = context;
         _currentUser = currentUser;
         _cache = cache;
+        _emailService = emailService;
     }
 
     // =====================================================
@@ -76,12 +79,10 @@ public class HelpController : ControllerBase
     public async Task<IActionResult> Contact(
         [FromBody] ContactSupportDto dto)
     {
-        var name = dto.Name.Trim();
-        var email = dto.Email.Trim();
         var subject = dto.Subject.Trim();
         var message = dto.Message.Trim();
 
-        if (name.Length == 0 || subject.Length == 0 || message.Length < 10)
+        if (subject.Length == 0 || message.Length < 10)
         {
             return BadRequest(new
             {
@@ -89,9 +90,26 @@ public class HelpController : ControllerBase
             });
         }
 
-        // Rate limit (per user)
+        // Name / Email client se nahi liye jaate: login user ke account (DB) se aate hain
         var userId = _currentUser.UserIdOrNull;
-        var limitKey = $"help-contact:{userId?.ToString() ?? "anon"}";
+
+        if (userId == null)
+            return Unauthorized(new { message = "Please log in again." });
+
+        var account = await _context.Students
+            .AsNoTracking()
+            .Where(x => x.Id == userId.Value)
+            .Select(x => new { x.Name, x.Email })
+            .FirstOrDefaultAsync();
+
+        if (account == null)
+            return Unauthorized(new { message = "Account not found. Please log in again." });
+
+        var name = account.Name;
+        var email = account.Email;
+
+        // Rate limit (per user)
+        var limitKey = $"help-contact:{userId.Value}";
 
         var count = _cache.TryGetValue(limitKey, out int existing)
             ? existing
@@ -175,7 +193,10 @@ public class HelpController : ControllerBase
                 Message = x.Message,
                 Status = x.Status,
                 CreatedAt = x.CreatedAt,
-                ResolvedAt = x.ResolvedAt
+                ResolvedAt = x.ResolvedAt,
+                AdminReply = x.AdminReply,
+                RepliedAt = x.RepliedAt,
+                RepliedBy = x.RepliedBy
             })
             .ToListAsync();
 
@@ -240,6 +261,87 @@ public class HelpController : ControllerBase
             $"Support message #{id} marked {item.Status}.";
 
         return Ok(new { message = $"Marked as {item.Status}." });
+    }
+
+    // POST /api/Help/messages/5/reply   body: { "reply": "...", "markResolved": true }
+    // Reply student ke email par Resend se jaata hai aur DB me save hota hai
+    [HttpPost("messages/{id:int}/reply")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> ReplyToMessage(
+        int id,
+        [FromBody] ReplySupportDto dto)
+    {
+        var reply = (dto.Reply ?? string.Empty).Trim();
+
+        if (reply.Length < 2)
+        {
+            return BadRequest(new
+            {
+                message = "Please write a reply."
+            });
+        }
+
+        var item = await _context.SupportMessages
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (item == null)
+            return NotFound(new { message = "Message not found." });
+
+        // Reply karne wale admin ka naam
+        var adminName = "Examo Support";
+        var adminId = _currentUser.UserIdOrNull;
+
+        if (adminId != null)
+        {
+            var foundName = await _context.Students
+                .AsNoTracking()
+                .Where(x => x.Id == adminId.Value)
+                .Select(x => x.Name)
+                .FirstOrDefaultAsync();
+
+            if (!string.IsNullOrWhiteSpace(foundName))
+                adminName = foundName;
+        }
+
+        // Pehle email bhejo; fail ho to DB me kuch save nahi hoga
+        try
+        {
+            await _emailService.SendSupportReplyAsync(
+                item.Email,
+                item.Name,
+                item.Subject,
+                item.Message,
+                reply);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return StatusCode(StatusCodes.Status502BadGateway, new
+            {
+                message = ex.Message
+            });
+        }
+
+        item.AdminReply = reply;
+        item.RepliedAt = DateTime.UtcNow;
+        item.RepliedBy = adminName;
+
+        if (dto.MarkResolved)
+        {
+            item.Status = StatusResolved;
+            item.ResolvedAt ??= DateTime.UtcNow;
+        }
+
+        await _context.SaveChangesAsync();
+
+        HttpContext.Items[AuditLogFilter.ActionKey] =
+            "Reply Support Message";
+        HttpContext.Items[AuditLogFilter.DetailsKey] =
+            $"Reply sent for support message #{id}.";
+
+        return Ok(new
+        {
+            message = $"Reply sent to {item.Email}."
+        });
     }
 
     // DELETE /api/Help/messages/5

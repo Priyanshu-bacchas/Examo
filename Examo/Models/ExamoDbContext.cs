@@ -364,6 +364,12 @@ public partial class ExamoDbContext : DbContext
                 .IsRequired()
                 .HasDefaultValue("Open");
 
+            entity.Property(e => e.AdminReply)
+                .HasMaxLength(5000);
+
+            entity.Property(e => e.RepliedBy)
+                .HasMaxLength(150);
+
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(
                     "CURRENT_TIMESTAMP");
