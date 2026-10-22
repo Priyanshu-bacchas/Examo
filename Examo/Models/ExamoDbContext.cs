@@ -32,6 +32,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<UserDocument> Documents { get; set; }
 
+    public virtual DbSet<SupportMessage> SupportMessages { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -325,6 +327,42 @@ public partial class ExamoDbContext : DbContext
 
             entity.Property(e => e.IpAddress)
                 .HasMaxLength(64);
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // SUPPORT MESSAGES (Help > Contact Us)
+        // =========================
+
+        modelBuilder.Entity<SupportMessage>(entity =>
+        {
+            entity.ToTable("SupportMessages");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Name)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.Email)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Subject)
+                .HasMaxLength(150)
+                .IsRequired();
+
+            entity.Property(e => e.Message)
+                .HasMaxLength(3000)
+                .IsRequired();
+
+            entity.Property(e => e.Status)
+                .HasMaxLength(20)
+                .IsRequired()
+                .HasDefaultValue("Open");
 
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(
