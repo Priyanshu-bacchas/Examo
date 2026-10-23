@@ -1,4 +1,5 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using FirebaseAdmin.Messaging;
+using Microsoft.EntityFrameworkCore;
 
 namespace Examo.Models;
 
@@ -33,6 +34,8 @@ public partial class ExamoDbContext : DbContext
     public virtual DbSet<UserDocument> Documents { get; set; }
 
     public virtual DbSet<SupportMessage> SupportMessages { get; set; }
+
+    public virtual DbSet<Notification> Notifications { get; set; }
 
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)

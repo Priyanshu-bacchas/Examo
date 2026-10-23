@@ -16,4 +16,11 @@ public interface IEmailService
         string subject,
         string originalMessage,
         string reply);
+
+    // Notification (exam form last date, exam reminder, result) email se bhejta hai
+    Task SendNotificationEmailAsync(
+        string toEmail,
+        string name,
+        string title,
+        string message);
 }

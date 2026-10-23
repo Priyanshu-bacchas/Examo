@@ -204,6 +204,38 @@ public class ResendEmailService : IEmailService
     }
 
     // =====================================================
+    // NOTIFICATION EMAIL (form last date / exam reminder / result)
+    // =====================================================
+    public async Task SendNotificationEmailAsync(
+        string toEmail,
+        string name,
+        string title,
+        string message)
+    {
+        var safeName = WebUtility.HtmlEncode(name);
+        var safeTitle = WebUtility.HtmlEncode(title);
+
+        var safeMessage = WebUtility.HtmlEncode(message)
+            .Replace("\r\n", "\n")
+            .Replace("\n", "<br>");
+
+        var html = $@"
+<div style=""font-family:Arial,Helvetica,sans-serif;max-width:520px;margin:0 auto;padding:24px;"">
+  <h2 style=""color:#1b2a52;margin:0 0 12px;"">{safeTitle}</h2>
+  <p style=""color:#444;"">Hi {safeName},</p>
+  <p style=""color:#222;font-size:15px;line-height:1.65;"">{safeMessage}</p>
+  <p style=""color:#444;margin-top:24px;"">Regards,<br>Team Examo</p>
+  <hr style=""border:none;border-top:1px solid #e5e7eb;margin:24px 0 12px;"">
+  <p style=""color:#999;font-size:12px;margin:0;"">You are receiving this because you use Examo to track your exams.</p>
+</div>";
+
+        var text =
+            $"Hi {name},\n\n{message}\n\nRegards,\nTeam Examo\n";
+
+        await SendAsync(toEmail, title, html, text, null);
+    }
+
+    // =====================================================
     // COMMON: Resend API call
     // =====================================================
     private async Task SendAsync(
