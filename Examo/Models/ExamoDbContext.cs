@@ -37,6 +37,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<Notification> Notifications { get; set; }
 
+    public virtual DbSet<JobPost> JobPosts { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
