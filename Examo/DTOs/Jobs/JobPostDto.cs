@@ -7,8 +7,8 @@ public class JobPostDto
 {
     [Required]
     [RegularExpression(
-        "^(Job|Result|AdmitCard)$",
-        ErrorMessage = "Category must be Job, Result or AdmitCard.")]
+        "^(Job|Result|AdmitCard|Exam)$",
+        ErrorMessage = "Category must be Job, Result, AdmitCard or Exam.")]
     public string Category { get; set; } = string.Empty;
 
     [Required]
@@ -25,13 +25,17 @@ public class JobPostDto
     [MaxLength(5000)]
     public string? Syllabus { get; set; }
 
+    // Job / Result / AdmitCard (optional): YouTube video link
+    [MaxLength(500)]
+    public string? Details { get; set; }
+
     // Result / AdmitCard
     public DateOnly? PostDate { get; set; }
 
     [MaxLength(30)]
     public string? Status { get; set; }
 
-    [Required]
+    // Exam category me Link nahi hota (Validate me check hota hai)
     [MaxLength(500)]
     public string Link { get; set; } = string.Empty;
 }
