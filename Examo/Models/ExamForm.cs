@@ -21,4 +21,9 @@ public partial class ExamForm
     public int? UserId { get; set; }
 
     public string Status { get; set; } = null!;
+
+    // Agar ye record Admin ki Job se "Add to ExamForm" karke bana hai,
+    // to us Job (JobPosts.Id) ka Id. Admin job edit/delete kare to
+    // isi se user ke records update/delete hote hain.
+    public int? SourceJobId { get; set; }
 }

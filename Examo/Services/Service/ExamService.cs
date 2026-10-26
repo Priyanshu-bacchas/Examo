@@ -16,7 +16,25 @@ public class ExamService : IExamService
 
     public async Task<IEnumerable<Exam>> GetAllAsync()
     {
-        return await _repository.GetAllAsync();
+        var exams = (await _repository.GetAllAsync()).ToList();
+
+        // Exam date nikal gayi aur status abhi bhi "Coming Soon" hai
+        // to apne aap "Done" ho jata hai.
+        var today = ExamStatusHelper.Today();
+
+        foreach (var exam in exams)
+        {
+            if (exam.ExamDate.HasValue &&
+                exam.ExamDate.Value < today &&
+                exam.Status != ExamStatusHelper.Done)
+            {
+                exam.Status = ExamStatusHelper.Done;
+
+                await _repository.UpdateAsync(exam);
+            }
+        }
+
+        return exams;
     }
 
     public async Task<Exam?> GetByIdAsync(int id)
@@ -30,7 +48,11 @@ public class ExamService : IExamService
         {
             ExamName = dto.ExamName,
             ExamDate = dto.ExamDate,
-            Status = dto.Status
+
+            // Date di hai to status date se tay hota hai
+            Status = dto.ExamDate.HasValue
+                ? ExamStatusHelper.FromDate(dto.ExamDate)
+                : dto.Status
         };
 
         return await _repository.AddAsync(exam);
@@ -47,9 +69,16 @@ public class ExamService : IExamService
             return null;
         }
 
+        var dateChanged = exam.ExamDate != dto.ExamDate;
+
         exam.ExamName = dto.ExamName;
         exam.ExamDate = dto.ExamDate;
-        exam.Status = dto.Status;
+
+        // Date badli hai to status nayi date ke hisaab se;
+        // date wahi hai to user ka chuna hua status rahega.
+        exam.Status = dateChanged && dto.ExamDate.HasValue
+            ? ExamStatusHelper.FromDate(dto.ExamDate)
+            : dto.Status;
 
         return await _repository.UpdateAsync(exam);
     }
