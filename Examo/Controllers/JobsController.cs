@@ -11,7 +11,7 @@ using Microsoft.EntityFrameworkCore;
 namespace Examo.Controllers;
 
 // Jobs / Results / Admit Cards
-//   GET     /api/Jobs?category=Job|Result|AdmitCard   -> koi bhi logged-in user
+//   GET     /api/Jobs?category=Job|Result|AdmitCard|Exam   -> koi bhi logged-in user
 //   POST    /api/Jobs                                 -> sirf Admin
 //   PUT     /api/Jobs/{id}                            -> sirf Admin
 //   DELETE  /api/Jobs/{id}                            -> sirf Admin
@@ -24,7 +24,8 @@ public class JobsController : ControllerBase
     {
         JobPost.CategoryJob,
         JobPost.CategoryResult,
-        JobPost.CategoryAdmitCard
+        JobPost.CategoryAdmitCard,
+        JobPost.CategoryExam
     };
 
     private static readonly string[] Statuses = { "Out", "Upcoming" };
@@ -59,7 +60,7 @@ public class JobsController : ControllerBase
         {
             return BadRequest(new
             {
-                message = "Category must be Job, Result or AdmitCard."
+                message = "Category must be Job, Result, AdmitCard or Exam."
             });
         }
 
@@ -81,13 +82,13 @@ public class JobsController : ControllerBase
         }
 
         // Jobs: jo naya add hua wo upar. Result / Admit Card: naye date wale upar.
-        var ordered = cat == JobPost.CategoryJob
+        var ordered = cat == JobPost.CategoryJob || cat == JobPost.CategoryExam
             ? query.OrderByDescending(x => x.Id)
             : query
                 .OrderByDescending(x => x.PostDate)
                 .ThenByDescending(x => x.Id);
 
-        var items = await ordered
+        var rows = await ordered
             .Take(Math.Clamp(take, 1, 500))
             .Select(x => new
             {
@@ -98,12 +99,79 @@ public class JobsController : ControllerBase
                 x.LastDate,
                 x.ExamDate,
                 x.Syllabus,
+                x.Details,
                 x.PostDate,
                 x.Status,
                 x.Link,
                 x.CreatedAt
             })
             .ToListAsync();
+
+        // Jobs me har job ke saath IsAdded bhejte hain: user ne ye job
+        // pehle se apni Exam Forms list me add ki hai ya nahi.
+        // Job list me hamesha dikhti rehti hai, bas button disable hota hai.
+        var addedIds = new HashSet<int>();
+
+        if (cat == JobPost.CategoryJob && rows.Count > 0)
+        {
+            var userId = _currentUser.UserIdOrNull;
+
+            if (userId != null)
+            {
+                var jobIds = rows.Select(x => x.Id).ToList();
+                var jobNames = rows
+                    .Select(x => x.ExamName.Trim().ToLower())
+                    .Distinct()
+                    .ToList();
+
+                var forms = await _context.ExamForms
+                    .AsNoTracking()
+                    .Where(f =>
+                        f.UserId == userId &&
+                        ((f.SourceJobId != null &&
+                          jobIds.Contains(f.SourceJobId.Value)) ||
+                         (f.SourceJobId == null &&
+                          jobNames.Contains(f.ExamName.ToLower()))))
+                    .Select(f => new { f.SourceJobId, f.ExamName })
+                    .ToListAsync();
+
+                foreach (var f in forms)
+                {
+                    if (f.SourceJobId != null)
+                    {
+                        addedIds.Add(f.SourceJobId.Value);
+                    }
+                    else
+                    {
+                        // Purana record (link hone se pehle ka) - naam se match
+                        var key = f.ExamName.Trim().ToLower();
+
+                        foreach (var r in rows.Where(r =>
+                            r.ExamName.Trim().ToLower() == key))
+                        {
+                            addedIds.Add(r.Id);
+                        }
+                    }
+                }
+            }
+        }
+
+        var items = rows.Select(x => new
+        {
+            x.Id,
+            x.Category,
+            x.ExamName,
+            x.StartDate,
+            x.LastDate,
+            x.ExamDate,
+            x.Syllabus,
+            x.Details,
+            x.PostDate,
+            x.Status,
+            x.Link,
+            x.CreatedAt,
+            IsAdded = addedIds.Contains(x.Id)
+        });
 
         return Ok(items);
     }
@@ -551,20 +619,41 @@ public class JobsController : ControllerBase
         {
             JobPost.CategoryAdmitCard => "Admit Card",
             JobPost.CategoryResult => "Result",
+            JobPost.CategoryExam => "Exam",
             _ => "Job"
         };
 
     private static string? Validate(string? category, JobPostDto dto)
     {
         if (category == null)
-            return "Category must be Job, Result or AdmitCard.";
+            return "Category must be Job, Result, AdmitCard or Exam.";
 
         if (string.IsNullOrWhiteSpace(dto.ExamName))
             return "Exam name is required.";
 
+        // Exam section: sirf Exam Form (naam) + Details (YouTube link)
+        if (category == JobPost.CategoryExam)
+        {
+            if (string.IsNullOrWhiteSpace(dto.Details))
+                return "Details (YouTube link) is required.";
+
+            if (!IsYouTubeUrl(dto.Details))
+                return "Details must be a valid YouTube link.";
+
+            return null;
+        }
+
         // javascript: jaise links rokne ke liye sirf http / https
         if (!IsHttpUrl(dto.Link))
             return "Please enter a valid link starting with http:// or https://";
+
+        // Details (YouTube video) teeno categories me optional hai,
+        // par dena ho to YouTube link hi
+        if (!string.IsNullOrWhiteSpace(dto.Details) &&
+            !IsYouTubeUrl(dto.Details))
+        {
+            return "Details must be a valid YouTube link.";
+        }
 
         if (category == JobPost.CategoryJob)
         {
@@ -589,6 +678,24 @@ public class JobsController : ControllerBase
         return null;
     }
 
+    private static bool IsYouTubeUrl(string? value)
+    {
+        if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri))
+            return false;
+
+        if (uri.Scheme != Uri.UriSchemeHttp &&
+            uri.Scheme != Uri.UriSchemeHttps)
+            return false;
+
+        var host = uri.Host.ToLowerInvariant();
+
+        return host == "youtu.be" ||
+               host == "youtube.com" ||
+               host.EndsWith(".youtube.com") ||
+               host == "youtube-nocookie.com" ||
+               host.EndsWith(".youtube-nocookie.com");
+    }
+
     private static bool IsHttpUrl(string? value)
     {
         if (!Uri.TryCreate(value?.Trim(), UriKind.Absolute, out var uri))
@@ -602,7 +709,14 @@ public class JobsController : ControllerBase
     private static void Apply(JobPost item, JobPostDto dto)
     {
         item.ExamName = dto.ExamName.Trim();
-        item.Link = dto.Link.Trim();
+        item.Link = item.Category == JobPost.CategoryExam
+            ? string.Empty
+            : (dto.Link ?? string.Empty).Trim();
+
+        // Details (YouTube link): Job, Result, Admit Card aur Exam sabme
+        item.Details = string.IsNullOrWhiteSpace(dto.Details)
+            ? null
+            : dto.Details.Trim();
 
         if (item.Category == JobPost.CategoryJob)
         {
@@ -612,6 +726,15 @@ public class JobsController : ControllerBase
             item.Syllabus = string.IsNullOrWhiteSpace(dto.Syllabus)
                 ? null
                 : dto.Syllabus.Trim();
+            item.PostDate = null;
+            item.Status = null;
+        }
+        else if (item.Category == JobPost.CategoryExam)
+        {
+            item.StartDate = null;
+            item.LastDate = null;
+            item.ExamDate = null;
+            item.Syllabus = null;
             item.PostDate = null;
             item.Status = null;
         }

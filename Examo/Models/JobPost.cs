@@ -12,9 +12,13 @@ public class JobPost
     public const string CategoryResult = "Result";
     public const string CategoryAdmitCard = "AdmitCard";
 
+    // Admin ke "Exam" section ki entries: Exam Form ka naam + Details (video link).
+    // Student ke Exam Forms page par naam match karke video dikhta hai.
+    public const string CategoryExam = "Exam";
+
     public int Id { get; set; }
 
-    // Job | Result | AdmitCard
+    // Job | Result | AdmitCard | Exam
     [MaxLength(20)]
     public string Category { get; set; } = string.Empty;
 
@@ -31,6 +35,10 @@ public class JobPost
 
     [MaxLength(5000)]
     public string? Syllabus { get; set; }
+
+    // Job / Result / AdmitCard (optional): YouTube video ka link (Details)
+    [MaxLength(500)]
+    public string? Details { get; set; }
 
     // Sirf Result / AdmitCard ke liye
     public DateOnly? PostDate { get; set; }

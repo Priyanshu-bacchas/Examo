@@ -477,6 +477,7 @@ CREATE TABLE IF NOT EXISTS ""JobPosts"" (
 
 ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""ExamDate"" date NULL;
 ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""Syllabus"" varchar(5000) NULL;
+ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""Details"" varchar(500) NULL;
 
 CREATE INDEX IF NOT EXISTS ""IX_JobPosts_Category""
     ON ""JobPosts"" (""Category"", ""Id"");");
