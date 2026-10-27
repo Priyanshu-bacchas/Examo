@@ -291,12 +291,12 @@ public class AuthService : IAuthService
             throw new EmailNotVerifiedException(student.Email);
         }
 
-        // Har login par email OTP (Admin ko chhodkar, taaki lockout na ho).
-        // Band karna ho: env var  Auth__LoginOtp = false
+        // Har login par email OTP - Student aur Admin dono ke liye.
+        // Band karna ho (jaise email na chal raha ho): env var  Auth__LoginOtp = false
         var loginOtpOn =
             _configuration.GetValue<bool?>("Auth:LoginOtp") ?? true;
 
-        if (loginOtpOn && student.Role != "Admin")
+        if (loginOtpOn)
         {
             try
             {

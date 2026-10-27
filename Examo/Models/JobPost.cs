@@ -40,6 +40,14 @@ public class JobPost
     [MaxLength(500)]
     public string? Details { get; set; }
 
+    // true = Draft: sirf Admin ko dikhta hai, students ko nahi.
+    // Publish karte hi (false) students ko dikhne lagta hai.
+    public bool IsDraft { get; set; }
+
+    // Exam / Result / AdmitCard entry jis Latest Job se apne aap bani hai,
+    // us Job ki Id (Job ki apni entry me null).
+    public int? SourceJobId { get; set; }
+
     // Sirf Result / AdmitCard ke liye
     public DateOnly? PostDate { get; set; }
 

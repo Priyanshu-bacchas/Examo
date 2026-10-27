@@ -15,6 +15,7 @@ namespace Examo.Controllers;
 //   POST    /api/Jobs                                 -> sirf Admin
 //   PUT     /api/Jobs/{id}                            -> sirf Admin
 //   DELETE  /api/Jobs/{id}                            -> sirf Admin
+//   PUT     /api/Jobs/{id}/publish                    -> sirf Admin (Draft <-> Published)
 //   POST    /api/Jobs/{id}/add                        -> logged-in user (Job ko apni list me add karo)
 [ApiController]
 [Route("api/[controller]")]
@@ -52,6 +53,7 @@ public class JobsController : ControllerBase
     public async Task<IActionResult> GetAll(
         [FromQuery] string? category,
         [FromQuery] bool activeOnly = false,
+        [FromQuery] bool includeDrafts = false,
         [FromQuery] int take = 200)
     {
         var cat = NormalizeCategory(category);
@@ -67,6 +69,11 @@ public class JobsController : ControllerBase
         var query = _context.JobPosts
             .AsNoTracking()
             .Where(x => x.Category == cat);
+
+        // Draft entries sirf Admin ko (includeDrafts=true par) dikhti hain.
+        // Students ko hamesha sirf Published entries milti hain.
+        if (!(includeDrafts && _currentUser.IsAdmin))
+            query = query.Where(x => !x.IsDraft);
 
         if (activeOnly && cat == JobPost.CategoryJob)
         {
@@ -100,6 +107,7 @@ public class JobsController : ControllerBase
                 x.ExamDate,
                 x.Syllabus,
                 x.Details,
+                x.IsDraft,
                 x.PostDate,
                 x.Status,
                 x.Link,
@@ -167,6 +175,7 @@ public class JobsController : ControllerBase
             x.Syllabus,
             x.Details,
             x.PostDate,
+            PublishStatus = x.IsDraft ? "Draft" : "Published",
             x.Status,
             x.Link,
             x.CreatedAt,
@@ -200,6 +209,10 @@ public class JobsController : ControllerBase
         _context.JobPosts.Add(item);
         await _context.SaveChangesAsync();
 
+        // Latest Job banate hi Exam / Result / Admit Card me entries (Draft) ban jaati hain
+        if (item.Category == JobPost.CategoryJob)
+            await JobSectionSync.EnsureChildrenAsync(_context, item);
+
         HttpContext.Items[AuditLogFilter.ActionKey] =
             $"Add {Label(cat!)}";
         HttpContext.Items[AuditLogFilter.DetailsKey] =
@@ -226,10 +239,28 @@ public class JobsController : ControllerBase
         var job = await _context.JobPosts
             .AsNoTracking()
             .FirstOrDefaultAsync(x =>
-                x.Id == id && x.Category == JobPost.CategoryJob);
+                x.Id == id &&
+                x.Category == JobPost.CategoryJob &&
+                !x.IsDraft);
 
         if (job == null)
             return NotFound(new { message = "Job not found." });
+
+        // Last date nikal gayi ho to job add nahi hogi
+        var utcOffset = _config.GetValue(
+            "Notifications:UtcOffsetMinutes",
+            330);
+
+        var todayDate = DateOnly.FromDateTime(
+            DateTime.UtcNow.AddMinutes(utcOffset));
+
+        if (job.LastDate != null && job.LastDate < todayDate)
+        {
+            return BadRequest(new
+            {
+                message = "The last date for this job has passed."
+            });
+        }
 
         var name = job.ExamName.Trim();
         var key = name.ToLower();
@@ -240,6 +271,15 @@ public class JobsController : ControllerBase
 
         // Is job se bana record ya (purana) same naam wala record
         // ko pehchano aur job se jod do (SourceJobId).
+
+        // Start date last date ke baad ho to start ko last date par rakho
+        var formEnd = job.LastDate
+            ?? job.StartDate
+            ?? todayDate;
+        var formStart = job.StartDate ?? todayDate;
+
+        if (formStart > formEnd)
+            formStart = formEnd;
 
         // ---- Exam Form ----
         var form = await _context.ExamForms.FirstOrDefaultAsync(x =>
@@ -252,11 +292,8 @@ public class JobsController : ControllerBase
             _context.ExamForms.Add(new ExamForm
             {
                 ExamName = name,
-                RegisterStartDate = job.StartDate
-                    ?? DateOnly.FromDateTime(DateTime.UtcNow),
-                RegisterEndDate = job.LastDate
-                    ?? job.StartDate
-                    ?? DateOnly.FromDateTime(DateTime.UtcNow),
+                RegisterStartDate = formStart,
+                RegisterEndDate = formEnd,
                 Link = job.Link,
                 Status = "Pending",
                 SourceJobId = job.Id,
@@ -432,10 +469,64 @@ public class JobsController : ControllerBase
         // Job (Latest Jobs) badli to jin users ne ise add kiya hai
         // unke Exam Form / Exam / Preparation / Result bhi update
         if (item.Category == JobPost.CategoryJob)
+        {
             await SyncJobToUsersAsync(item, old);
+            await SyncSectionsAsync(item, old);
+        }
 
         HttpContext.Items[AuditLogFilter.ActionKey] =
             $"Edit {Label(item.Category)}";
+        HttpContext.Items[AuditLogFilter.DetailsKey] =
+            item.ExamName;
+
+        return NoContent();
+    }
+
+    // =====================================================
+    // PUBLISH / UNPUBLISH (Admin)  - ek click me Draft <-> Published
+    // =====================================================
+    [HttpPut("{id:int}/publish")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> SetPublished(
+        int id,
+        [FromBody] JobPublishDto dto)
+    {
+        var item = await _context.JobPosts
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (item == null)
+            return NotFound(new { message = "Record not found." });
+
+        // Adhuri entry student ko dikhne se rokne ke liye
+        if (dto.Published)
+        {
+            if ((item.Category == JobPost.CategoryResult ||
+                 item.Category == JobPost.CategoryAdmitCard) &&
+                item.PostDate == null)
+            {
+                return BadRequest(new
+                {
+                    message = "Add the date (Edit) before publishing."
+                });
+            }
+
+            if (item.Category == JobPost.CategoryExam &&
+                string.IsNullOrWhiteSpace(item.Details))
+            {
+                return BadRequest(new
+                {
+                    message =
+                        "Add the Details (video link) (Edit) before publishing."
+                });
+            }
+        }
+
+        item.IsDraft = !dto.Published;
+
+        await _context.SaveChangesAsync();
+
+        HttpContext.Items[AuditLogFilter.ActionKey] =
+            $"{(dto.Published ? "Publish" : "Unpublish")} {Label(item.Category)}";
         HttpContext.Items[AuditLogFilter.DetailsKey] =
             item.ExamName;
 
@@ -458,6 +549,12 @@ public class JobsController : ControllerBase
         // Job delete hui to isse bane user records bhi hat jaate hain
         if (item.Category == JobPost.CategoryJob)
         {
+            // Is job se bani Exam / Result / Admit Card entries bhi hat jaati hain
+            _context.JobPosts.RemoveRange(
+                await _context.JobPosts
+                    .Where(x => x.SourceJobId == id)
+                    .ToListAsync());
+
             _context.ExamForms.RemoveRange(
                 await _context.ExamForms
                     .Where(x => x.SourceJobId == id)
@@ -502,6 +599,39 @@ public class JobsController : ControllerBase
         DateOnly? ExamDate,
         string? Syllabus,
         string Link);
+
+    // Job ka naam / link badla to Exam, Result, Admit Card ki entries me bhi badalta hai.
+    // Jis cheez ko admin ne un sections me khud alag kar diya ho, wo waisi hi rehti hai.
+    private async Task SyncSectionsAsync(JobPost job, JobSnapshot old)
+    {
+        var nameChanged = old.ExamName.Trim() != job.ExamName;
+        var linkChanged = old.Link != job.Link;
+
+        if (!nameChanged && !linkChanged)
+            return;
+
+        var children = await _context.JobPosts
+            .Where(x => x.SourceJobId == job.Id)
+            .ToListAsync();
+
+        foreach (var child in children)
+        {
+            if (nameChanged &&
+                child.ExamName.Trim() == old.ExamName.Trim())
+            {
+                child.ExamName = job.ExamName;
+            }
+
+            if (linkChanged &&
+                child.Category != JobPost.CategoryExam &&
+                child.Link == old.Link)
+            {
+                child.Link = job.Link;
+            }
+        }
+
+        await _context.SaveChangesAsync();
+    }
 
     // Admin ne job me jo badla, wahi un users ke records me bhi badalta hai
     // jinhone ye job add ki hai. Jo cheez admin ne nahi badli, wo user ki
@@ -660,8 +790,8 @@ public class JobsController : ControllerBase
             if (dto.StartDate == null || dto.LastDate == null)
                 return "Start date and last date are required.";
 
-            if (dto.LastDate < dto.StartDate)
-                return "Last date cannot be before the start date.";
+            // Start date aur last date ka order ab check nahi hota:
+            // job last date tak list me rehti hai aur last date tak hi add hoti hai.
         }
         else
         {
@@ -712,6 +842,12 @@ public class JobsController : ControllerBase
         item.Link = item.Category == JobPost.CategoryExam
             ? string.Empty
             : (dto.Link ?? string.Empty).Trim();
+
+        // Draft / Published (default Published)
+        item.IsDraft = string.Equals(
+            dto.PublishStatus?.Trim(),
+            "Draft",
+            StringComparison.OrdinalIgnoreCase);
 
         // Details (YouTube link): Job, Result, Admit Card aur Exam sabme
         item.Details = string.IsNullOrWhiteSpace(dto.Details)
