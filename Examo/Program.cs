@@ -478,6 +478,8 @@ CREATE TABLE IF NOT EXISTS ""JobPosts"" (
 ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""ExamDate"" date NULL;
 ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""Syllabus"" varchar(5000) NULL;
 ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""Details"" varchar(500) NULL;
+ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""IsDraft"" boolean NOT NULL DEFAULT false;
+ALTER TABLE ""JobPosts"" ADD COLUMN IF NOT EXISTS ""SourceJobId"" integer NULL;
 
 CREATE INDEX IF NOT EXISTS ""IX_JobPosts_Category""
     ON ""JobPosts"" (""Category"", ""Id"");");
@@ -512,6 +514,38 @@ ALTER TABLE ""Results"" ADD COLUMN IF NOT EXISTS ""SourceJobId"" integer NULL;")
     {
         Console.WriteLine(
             "Could not ensure SourceJobId columns: " + ex.Message);
+    }
+}
+
+// =====================================================
+// PURANI JOBS KE SECTIONS
+// Jis Latest Job ke Exam / Result / Admit Card section ki entries abhi
+// tak nahi bani, wo (Draft me) bana deta hai. Sirf ek baar chalta hai:
+// jis job ki entries ban chuki hain use dobara nahi chhuta.
+// =====================================================
+
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider
+            .GetRequiredService<ExamoDbContext>();
+
+        var jobsWithoutSections = await db.JobPosts
+            .Where(x =>
+                x.Category == JobPost.CategoryJob &&
+                !db.JobPosts.Any(c => c.SourceJobId == x.Id))
+            .ToListAsync();
+
+        foreach (var job in jobsWithoutSections)
+        {
+            await JobSectionSync.EnsureChildrenAsync(db, job);
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(
+            "Could not create sections for old jobs: " + ex.Message);
     }
 }
 
