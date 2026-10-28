@@ -1,4 +1,5 @@
-﻿using System.Security.Cryptography;
+﻿using Examo.Filters;
+using System.Security.Cryptography;
 using System.Text;
 
 using Examo.Services.Interfaces;
@@ -10,6 +11,7 @@ namespace Examo.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequireSubscription]
 public class NotificationsController : ControllerBase
 {
     private readonly INotificationService _service;

@@ -1,4 +1,5 @@
-﻿using Examo.DTOs.Exam;
+﻿using Examo.Filters;
+using Examo.DTOs.Exam;
 using Examo.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,6 +7,7 @@ namespace Examo.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequireSubscription]
 public class ExamsController : ControllerBase
 {
     private readonly IExamService _service;

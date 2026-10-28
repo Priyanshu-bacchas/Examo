@@ -50,6 +50,7 @@ public class JobsController : ControllerBase
     //   activeOnly=true -> sirf wo Jobs jinki last date nikli nahi (students ke liye)
     // =====================================================
     [HttpGet]
+    [RequireSubscription]
     public async Task<IActionResult> GetAll(
         [FromQuery] string? category,
         [FromQuery] bool activeOnly = false,
@@ -232,6 +233,7 @@ public class JobsController : ControllerBase
     //   wo dobara nahi banta.
     // =====================================================
     [HttpPost("{id:int}/add")]
+    [RequireSubscription]
     public async Task<IActionResult> AddToMyList(int id)
     {
         var userId = _currentUser.UserId;

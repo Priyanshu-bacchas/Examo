@@ -1,4 +1,5 @@
-﻿using Examo.DTOs.Schedule;
+﻿using Examo.Filters;
+using Examo.DTOs.Schedule;
 using Examo.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,11 +7,12 @@ namespace Examo.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequireSubscription]
 public class SchedulesController : ControllerBase
 {
     private readonly IScheduleService _service;
 
-public SchedulesController(IScheduleService service)
+    public SchedulesController(IScheduleService service)
     {
         _service = service;
     }
