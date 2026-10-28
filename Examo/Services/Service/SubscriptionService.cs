@@ -28,8 +28,8 @@ public class SubscriptionService : ISubscriptionService
 
     private static readonly SubscriptionPlan[] AllPlans =
     {
-        // Monthly Rs 49 (4900 paise), Yearly Rs 199 (19900 paise).
-        new() { Key = "monthly", Name = "Monthly Plan", AmountPaise = 4900,  Days = 30  },
+        // TESTING: Monthly Rs 1 (100 paise). Live se pehle 4900 kar dena. Yearly Rs 199 (19900 paise).
+        new() { Key = "monthly", Name = "Monthly Plan", AmountPaise = 100,   Days = 30  },
         new() { Key = "yearly",  Name = "Yearly Plan",  AmountPaise = 19900, Days = 365 }
     };
 
