@@ -97,10 +97,23 @@ public class SubscriptionController : ControllerBase
 
             var baseUrl = $"{scheme}://{Request.Host}";
 
+            // User kis website se aaya (browser khud Origin bhejta hai)
+            var origin = Request.Headers["Origin"].FirstOrDefault();
+
+            if (string.IsNullOrWhiteSpace(origin) &&
+                Uri.TryCreate(
+                    Request.Headers["Referer"].FirstOrDefault(),
+                    UriKind.Absolute,
+                    out var referer))
+            {
+                origin = $"{referer.Scheme}://{referer.Authority}";
+            }
+
             var result = await _service.CreateCheckoutAsync(
                 _currentUser.UserId,
                 request.Plan,
-                baseUrl);
+                baseUrl,
+                origin);
 
             return Ok(result);
         }

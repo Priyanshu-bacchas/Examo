@@ -81,27 +81,66 @@ public class SubscriptionService : ISubscriptionService
     private string ConfiguredBackendUrl =>
         First(_config["PayU:BackendUrl"]).TrimEnd('/');
 
-    private string FrontendUrl
+    // Frontend ke possible URLs (App__FrontendUrl + Cors__AllowedOrigins)
+    private List<string> ConfiguredFrontends()
     {
-        get
+        var list = new List<string>();
+
+        var app = First(_config["App:FrontendUrl"]).TrimEnd('/');
+
+        if (app.Length > 0)
+            list.Add(app);
+
+        list.AddRange(
+            (_config["Cors:AllowedOrigins"] ?? "")
+                .Split(new[] { ',', ';' },
+                    StringSplitOptions.RemoveEmptyEntries
+                    | StringSplitOptions.TrimEntries)
+                .Select(x => x.TrimEnd('/'))
+                .Where(x => x.Length > 0));
+
+        return list
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+    }
+
+    // Config me jo pehla URL hai, warna local
+    private string DefaultFrontendUrl =>
+        ConfiguredFrontends().FirstOrDefault() ?? "http://localhost:5173";
+
+    // User jis website se payment shuru karta hai, wahi wapas aana chahiye
+    // (live site se live, local se local). Galat / anjaan URL par kabhi nahi bhejte.
+    private string ResolveFrontendUrl(string? requested)
+    {
+        var candidate = (requested ?? "").Trim();
+
+        if (candidate.Length > 0 &&
+            Uri.TryCreate(candidate, UriKind.Absolute, out var uri) &&
+            (uri.Scheme == Uri.UriSchemeHttps ||
+             uri.Scheme == Uri.UriSchemeHttp))
         {
-            var url = First(_config["App:FrontendUrl"]);
+            var origin = $"{uri.Scheme}://{uri.Authority}";
 
-            if (string.IsNullOrWhiteSpace(url))
-            {
-                // Cors ka pehla origin hi frontend hota hai
-                url = (_config["Cors:AllowedOrigins"] ?? "")
-                    .Split(new[] { ',', ';' },
-                        StringSplitOptions.RemoveEmptyEntries
-                        | StringSplitOptions.TrimEntries)
-                    .FirstOrDefault() ?? "";
-            }
+            var configured = ConfiguredFrontends();
 
-            if (string.IsNullOrWhiteSpace(url))
-                url = "http://localhost:5173";
+            var isLocal =
+                uri.Host == "localhost" ||
+                uri.Host == "127.0.0.1";
 
-            return url.TrimEnd('/');
+            var isConfigured = configured.Contains(
+                origin,
+                StringComparer.OrdinalIgnoreCase);
+
+            // Kuch configure nahi hai to sirf https wali site maano
+            var noConfigHttps =
+                configured.Count == 0 &&
+                uri.Scheme == Uri.UriSchemeHttps;
+
+            if (isLocal || isConfigured || noConfigHttps)
+                return origin;
         }
+
+        return DefaultFrontendUrl;
     }
 
     private static string First(params string?[] values)
@@ -187,7 +226,8 @@ public class SubscriptionService : ISubscriptionService
     public async Task<PayUCheckoutResult> CreateCheckoutAsync(
         int userId,
         string planKey,
-        string backendBaseUrl)
+        string backendBaseUrl,
+        string? frontendOrigin)
     {
         var plan = FindPlan(planKey)
             ?? throw new ArgumentException("Please choose a valid plan.");
@@ -229,6 +269,9 @@ public class SubscriptionService : ISubscriptionService
         var email = (student.Email ?? "").Trim();
         var phone = CleanPhone(student.MobileNumber);
 
+        // udf1 me frontend ka URL jaata hai; PayU wapas bhejta hai aur hash me bhi judta hai
+        var frontendUrl = ResolveFrontendUrl(frontendOrigin);
+
         var hash = Sha512Hex(string.Join("|", new[]
         {
             MerchantKey,
@@ -237,8 +280,8 @@ public class SubscriptionService : ISubscriptionService
             productInfo,
             firstName,
             email,
-            // udf1..udf5 (khaali) + 5 reserved (khaali)
-            "", "", "", "", "",
+            // udf1 (frontend URL), udf2..udf5 (khaali) + 5 reserved (khaali)
+            frontendUrl, "", "", "", "",
             "", "", "", "", "",
             MerchantSalt
         }));
@@ -273,6 +316,7 @@ public class SubscriptionService : ISubscriptionService
                 ["firstname"] = firstName,
                 ["email"] = email,
                 ["phone"] = phone,
+                ["udf1"] = frontendUrl,
                 ["surl"] = callback,
                 ["furl"] = callback,
                 ["hash"] = hash
@@ -292,12 +336,15 @@ public class SubscriptionService : ISubscriptionService
         var txnId = Get("txnid");
         var status = Get("status");
 
+        // Hash sahi hone ke baad udf1 se asli frontend URL milta hai
+        var frontendBase = DefaultFrontendUrl;
+
         PayUCallbackResult Done(bool ok, string result) => new()
         {
             Success = ok,
             TxnId = txnId,
             RedirectUrl =
-                $"{FrontendUrl}/?payment={result}&txn={Uri.EscapeDataString(txnId)}"
+                $"{frontendBase}/?payment={result}&txn={Uri.EscapeDataString(txnId)}"
         };
 
         if (string.IsNullOrWhiteSpace(txnId) ||
@@ -341,6 +388,9 @@ public class SubscriptionService : ISubscriptionService
 
             return Done(false, "error");
         }
+
+        // Hash verify ho chuka hai, ab udf1 par bharosa kar sakte hain
+        frontendBase = ResolveFrontendUrl(Get("udf1"));
 
         var payment = await _db.Payments
             .FirstOrDefaultAsync(x => x.RazorpayOrderId == txnId);
