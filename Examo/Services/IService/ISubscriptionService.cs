@@ -64,11 +64,13 @@ public interface ISubscriptionService
 
     Task<SubscriptionStatus> GetStatusAsync(int userId);
 
-    // backendBaseUrl: PayU is URL par surl/furl ke liye wapas aayega
+    // backendBaseUrl : PayU is URL par surl/furl ke liye wapas aayega
+    // frontendOrigin : user jis website se aaya (payment ke baad wapas wahin bhejna hai)
     Task<PayUCheckoutResult> CreateCheckoutAsync(
         int userId,
         string planKey,
-        string backendBaseUrl);
+        string backendBaseUrl,
+        string? frontendOrigin);
 
     // PayU ka response (surl / furl / webhook): hash check, phir plan chalu
     Task<PayUCallbackResult> HandlePayUResponseAsync(
