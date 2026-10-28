@@ -1,4 +1,5 @@
-﻿using Examo.DTOs.Subject;
+﻿using Examo.Filters;
+using Examo.DTOs.Subject;
 using Examo.Services.Interfaces;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +8,7 @@ namespace Examo.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequireSubscription]
 public class SubjectsController : ControllerBase
 {
     private readonly ISubjectService _service;

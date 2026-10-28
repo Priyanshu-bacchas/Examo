@@ -1,4 +1,5 @@
-﻿using Examo.DTOs.Preparation;
+﻿using Examo.Filters;
+using Examo.DTOs.Preparation;
 using Examo.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 
@@ -6,6 +7,7 @@ namespace Examo.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[RequireSubscription]
 public class PreparationsController : ControllerBase
 {
     private readonly IPreparationService _service;

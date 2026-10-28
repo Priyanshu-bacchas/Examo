@@ -39,6 +39,10 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<JobPost> JobPosts { get; set; }
 
+    public virtual DbSet<Payment> Payments { get; set; }
+
+    public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {

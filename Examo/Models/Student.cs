@@ -28,6 +28,11 @@ public class Student
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    // Free trial ki last tarikh. Null = trial abhi shuru nahi hua
+    // (pehli baar subscription status check hote hi 2 din ka trial lagta hai).
+    [JsonIgnore]
+    public DateTime? TrialEndsAt { get; set; }
+
     // =====================================================
     // EMAIL OTP (verification + forgot password)
     // =====================================================
