@@ -1,6 +1,4 @@
-﻿using System.Text;
-
-using Examo.Services.Interfaces;
+﻿using Examo.Services.Interfaces;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -50,8 +48,8 @@ public class SubscriptionController : ControllerBase
                 x.PlanKey,
                 Amount = x.AmountPaise / 100m,
                 x.Currency,
-                x.RazorpayPaymentId,
-                x.RazorpayOrderId,
+                PaymentId = x.RazorpayPaymentId,
+                TxnId = x.RazorpayOrderId,
                 x.PaidAt
             })
             .ToListAsync();
@@ -76,21 +74,33 @@ public class SubscriptionController : ControllerBase
         });
     }
 
-    public class CreateOrderRequest
+    public class CheckoutRequest
     {
         public string Plan { get; set; } = string.Empty;
     }
 
-    // POST /api/Subscription/order   { "plan": "monthly" | "yearly" }
-    [HttpPost("order")]
-    public async Task<IActionResult> CreateOrder(
-        [FromBody] CreateOrderRequest request)
+    // POST /api/Subscription/checkout   { "plan": "monthly" | "yearly" }
+    [HttpPost("checkout")]
+    public async Task<IActionResult> Checkout(
+        [FromBody] CheckoutRequest request)
     {
         try
         {
-            var result = await _service.CreateOrderAsync(
+            // PayU yahin wapas aayega (agar PayU__BackendUrl set nahi hai to)
+            var scheme = Request.Headers["X-Forwarded-Proto"]
+                .FirstOrDefault()?
+                .Split(',')[0]
+                .Trim();
+
+            if (string.IsNullOrWhiteSpace(scheme))
+                scheme = Request.Scheme;
+
+            var baseUrl = $"{scheme}://{Request.Host}";
+
+            var result = await _service.CreateCheckoutAsync(
                 _currentUser.UserId,
-                request.Plan);
+                request.Plan,
+                baseUrl);
 
             return Ok(result);
         }
@@ -104,68 +114,90 @@ public class SubscriptionController : ControllerBase
         }
     }
 
-    public class VerifyRequest
-    {
-        public string OrderId { get; set; } = string.Empty;
-
-        public string PaymentId { get; set; } = string.Empty;
-
-        public string Signature { get; set; } = string.Empty;
-    }
-
-    // POST /api/Subscription/verify
-    [HttpPost("verify")]
-    public async Task<IActionResult> Verify([FromBody] VerifyRequest request)
-    {
-        try
-        {
-            var status = await _service.VerifyPaymentAsync(
-                _currentUser.UserId,
-                request.OrderId,
-                request.PaymentId,
-                request.Signature);
-
-            return Ok(status);
-        }
-        catch (ArgumentException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (InvalidOperationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
-    }
-
-    // POST /api/Subscription/webhook  (Razorpay khud bulata hai, login nahi hota)
-    [HttpPost("webhook")]
+    // POST /api/Subscription/payu/callback
+    // PayU user ke browser ko yahan POST karke bhejta hai (surl / furl).
+    // Login nahi hota, isliye security PayU ke hash se hoti hai.
+    [HttpPost("payu/callback")]
     [AllowAnonymous]
-    public async Task<IActionResult> Webhook()
+    public async Task<IActionResult> PayUCallback()
     {
-        string body;
-
-        using (var reader = new StreamReader(Request.Body, Encoding.UTF8))
-        {
-            body = await reader.ReadToEndAsync();
-        }
-
-        var signature = Request.Headers["X-Razorpay-Signature"].ToString();
+        var form = await ReadFieldsAsync();
 
         try
         {
-            await _service.HandleWebhookAsync(body, signature);
+            var result = await _service.HandlePayUResponseAsync(form);
 
-            return Ok();
+            return Redirect(result.RedirectUrl);
         }
-        catch (UnauthorizedAccessException)
+        catch (Exception ex)
         {
-            return Unauthorized();
-        }
-        catch (InvalidOperationException ex)
-        {
-            _logger.LogError(ex, "Webhook could not be processed.");
+            _logger.LogError(ex, "PayU callback could not be processed.");
 
             return StatusCode(500);
         }
+    }
+
+    // POST /api/Subscription/payu/webhook   (optional)
+    // PayU dashboard me webhook lagao to tab band hone par bhi payment confirm hoti hai.
+    [HttpPost("payu/webhook")]
+    [AllowAnonymous]
+    public async Task<IActionResult> PayUWebhook()
+    {
+        var form = await ReadFieldsAsync();
+
+        try
+        {
+            await _service.HandlePayUResponseAsync(form);
+
+            return Ok();
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "PayU webhook could not be processed.");
+
+            return StatusCode(500);
+        }
+    }
+
+    // Form ya JSON dono se fields padho
+    private async Task<Dictionary<string, string>> ReadFieldsAsync()
+    {
+        var fields = new Dictionary<string, string>(
+            StringComparer.OrdinalIgnoreCase);
+
+        if (Request.HasFormContentType)
+        {
+            var form = await Request.ReadFormAsync();
+
+            foreach (var item in form)
+                fields[item.Key] = item.Value.ToString();
+
+            return fields;
+        }
+
+        try
+        {
+            using var doc = await System.Text.Json.JsonDocument.ParseAsync(
+                Request.Body);
+
+            if (doc.RootElement.ValueKind ==
+                System.Text.Json.JsonValueKind.Object)
+            {
+                foreach (var prop in doc.RootElement.EnumerateObject())
+                {
+                    fields[prop.Name] =
+                        prop.Value.ValueKind ==
+                        System.Text.Json.JsonValueKind.String
+                            ? prop.Value.GetString() ?? ""
+                            : prop.Value.ToString();
+                }
+            }
+        }
+        catch
+        {
+            // Khaali / galat body: khaali fields wapas, hash check fail ho jayega
+        }
+
+        return fields;
     }
 }

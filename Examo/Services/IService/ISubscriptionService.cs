@@ -32,25 +32,30 @@ public class SubscriptionStatus
     public int DaysLeft { get; set; }
 }
 
-public class CreateOrderResult
+// Frontend is data se PayU ko form POST karta hai
+public class PayUCheckoutResult
 {
-    public string KeyId { get; set; } = string.Empty;
+    // https://test.payu.in/_payment  ya  https://secure.payu.in/_payment
+    public string ActionUrl { get; set; } = string.Empty;
 
-    public string OrderId { get; set; } = string.Empty;
+    // key, txnid, amount, productinfo, firstname, email, phone, surl, furl, hash
+    public Dictionary<string, string> Fields { get; set; } = new();
 
-    public int Amount { get; set; }
-
-    public string Currency { get; set; } = "INR";
+    public string TxnId { get; set; } = string.Empty;
 
     public string PlanKey { get; set; } = string.Empty;
 
     public string PlanName { get; set; } = string.Empty;
+}
 
-    public string Name { get; set; } = string.Empty;
+public class PayUCallbackResult
+{
+    public bool Success { get; set; }
 
-    public string Email { get; set; } = string.Empty;
+    public string TxnId { get; set; } = string.Empty;
 
-    public string? Contact { get; set; }
+    // Browser ko yahin bhejna hai (frontend ka Subscription page)
+    public string RedirectUrl { get; set; } = string.Empty;
 }
 
 public interface ISubscriptionService
@@ -59,13 +64,13 @@ public interface ISubscriptionService
 
     Task<SubscriptionStatus> GetStatusAsync(int userId);
 
-    Task<CreateOrderResult> CreateOrderAsync(int userId, string planKey);
-
-    Task<SubscriptionStatus> VerifyPaymentAsync(
+    // backendBaseUrl: PayU is URL par surl/furl ke liye wapas aayega
+    Task<PayUCheckoutResult> CreateCheckoutAsync(
         int userId,
-        string orderId,
-        string paymentId,
-        string signature);
+        string planKey,
+        string backendBaseUrl);
 
-    Task HandleWebhookAsync(string rawBody, string? signature);
+    // PayU ka response (surl / furl / webhook): hash check, phir plan chalu
+    Task<PayUCallbackResult> HandlePayUResponseAsync(
+        IDictionary<string, string> form);
 }
