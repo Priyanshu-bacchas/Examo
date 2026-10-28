@@ -303,14 +303,48 @@ builder.Services.AddControllers(options =>
 // CORS
 // =====================================================
 
+// Live me sirf apna frontend allow hota hai.
+// Render env var:  Cors__AllowedOrigins = https://tera-frontend.vercel.app
+// (ek se zyada ho to comma se alag karo, aakhir me "/" mat lagao)
+// Khaali ho to purane jaisa sab origins allow rehte hain.
+var allowedOrigins =
+    (builder.Configuration["Cors:AllowedOrigins"] ?? "")
+        .Split(
+            new[] { ',', ';' },
+            StringSplitOptions.RemoveEmptyEntries
+                | StringSplitOptions.TrimEntries)
+        .Select(x => x.TrimEnd('/'))
+        .Where(x => x.Length > 0)
+        .ToList();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(
         "ReactApp",
         policy =>
         {
+            if (allowedOrigins.Count == 0)
+            {
+                policy
+                    .AllowAnyOrigin()
+                    .AllowAnyHeader()
+                    .AllowAnyMethod();
+
+                return;
+            }
+
+            // Local testing ke liye localhost bhi chalta rahega
+            var origins = allowedOrigins
+                .Concat(new[]
+                {
+                    "http://localhost:5173",
+                    "https://localhost:5173"
+                })
+                .Distinct()
+                .ToArray();
+
             policy
-                .AllowAnyOrigin()
+                .WithOrigins(origins)
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         }
