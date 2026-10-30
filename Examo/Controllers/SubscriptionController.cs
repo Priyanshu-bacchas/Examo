@@ -52,7 +52,17 @@ public class SubscriptionController : ControllerBase
                 x.Currency,
                 PaymentId = x.RazorpayPaymentId,
                 TxnId = x.RazorpayOrderId,
-                x.PaidAt
+                x.PaidAt,
+
+                // Is payment se jo plan mila uski start / end date (slip ke liye)
+                StartsAt = _context.UserSubscriptions
+                    .Where(s => s.PaymentId == x.Id)
+                    .Select(s => (DateTime?)s.StartsAt)
+                    .FirstOrDefault(),
+                EndsAt = _context.UserSubscriptions
+                    .Where(s => s.PaymentId == x.Id)
+                    .Select(s => (DateTime?)s.EndsAt)
+                    .FirstOrDefault()
             })
             .ToListAsync();
 
