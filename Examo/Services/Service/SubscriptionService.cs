@@ -6,6 +6,7 @@ using Examo.Models;
 using Examo.Services.Interfaces;
 
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace Examo.Services;
 
@@ -24,18 +25,22 @@ namespace Examo.Services;
 //   RazorpayPaymentId = PayU mihpayid
 public class SubscriptionService : ISubscriptionService
 {
-    private const int TrialDays = 2;
+    public const int TrialDays = 2;
 
+    private const string PriceCacheKey = "plan-prices";
+
+    // Default prices. Asli price admin ke Payments > Plan Pricing se aati hai
+    // (PlanPrices table); table me row na ho to ye default chalti hai.
     private static readonly SubscriptionPlan[] AllPlans =
     {
-        // TESTING: Monthly Rs 1 (100 paise). Live se pehle 4900 kar dena. Yearly Rs 199 (19900 paise).
-        new() { Key = "monthly", Name = "Monthly Plan", AmountPaise = 100,   Days = 30  },
+        new() { Key = "monthly", Name = "Monthly Plan", AmountPaise = 4900,  Days = 30  },
         new() { Key = "yearly",  Name = "Yearly Plan",  AmountPaise = 19900, Days = 365 }
     };
 
     private readonly ExamoDbContext _db;
     private readonly IConfiguration _config;
     private readonly IEmailService _email;
+    private readonly IMemoryCache _cache;
     private readonly ILogger<SubscriptionService> _logger;
 
     public SubscriptionService(
@@ -43,19 +48,109 @@ public class SubscriptionService : ISubscriptionService
         HttpClient http,
         IConfiguration config,
         IEmailService email,
+        IMemoryCache cache,
         ILogger<SubscriptionService> logger)
     {
         _db = db;
         _config = config;
         _email = email;
+        _cache = cache;
         _logger = logger;
     }
 
-    public IReadOnlyList<SubscriptionPlan> Plans => AllPlans;
-
+    // Naam / din ke liye (price yahan se kabhi nahi lete)
     private static SubscriptionPlan? FindPlan(string? key) =>
         AllPlans.FirstOrDefault(p =>
             string.Equals(p.Key, key?.Trim(), StringComparison.OrdinalIgnoreCase));
+
+    // ---------------- Plan prices (admin set karta hai) ----------------
+
+    public async Task<IReadOnlyList<SubscriptionPlan>> GetPlansAsync()
+    {
+        var prices = await GetPriceOverridesAsync();
+
+        return AllPlans
+            .Select(p => new SubscriptionPlan
+            {
+                Key = p.Key,
+                Name = p.Name,
+                Days = p.Days,
+                AmountPaise = prices.TryGetValue(p.Key, out var paise)
+                    ? paise
+                    : p.AmountPaise
+            })
+            .ToList();
+    }
+
+    private async Task<Dictionary<string, int>> GetPriceOverridesAsync()
+    {
+        if (_cache.TryGetValue(PriceCacheKey, out Dictionary<string, int>? cached) &&
+            cached != null)
+        {
+            return cached;
+        }
+
+        try
+        {
+            var rows = await _db.PlanPrices.AsNoTracking().ToListAsync();
+
+            var map = rows
+                .Where(x => x.AmountPaise >= 100)
+                .GroupBy(x => x.PlanKey.ToLowerInvariant())
+                .ToDictionary(g => g.Key, g => g.First().AmountPaise);
+
+            _cache.Set(PriceCacheKey, map, TimeSpan.FromMinutes(2));
+
+            return map;
+        }
+        catch (Exception ex)
+        {
+            // Table abhi na ho to default price se kaam chalta rahe
+            _logger.LogError(ex, "Plan prices could not be loaded.");
+
+            return new Dictionary<string, int>();
+        }
+    }
+
+    public async Task SetPlanPriceAsync(
+        string planKey,
+        int amountPaise,
+        string? updatedBy)
+    {
+        var plan = FindPlan(planKey)
+            ?? throw new ArgumentException("Please choose a valid plan.");
+
+        // Payment gateway ka minimum Rs 1 hai
+        if (amountPaise < 100 || amountPaise > 10_000_000)
+        {
+            throw new ArgumentException(
+                "Price must be between Rs 1 and Rs 1,00,000.");
+        }
+
+        var row = await _db.PlanPrices
+            .FirstOrDefaultAsync(x => x.PlanKey == plan.Key);
+
+        if (row == null)
+        {
+            _db.PlanPrices.Add(new SubscriptionPlanPrice
+            {
+                PlanKey = plan.Key,
+                AmountPaise = amountPaise,
+                UpdatedAt = DateTime.UtcNow,
+                UpdatedBy = updatedBy
+            });
+        }
+        else
+        {
+            row.AmountPaise = amountPaise;
+            row.UpdatedAt = DateTime.UtcNow;
+            row.UpdatedBy = updatedBy;
+        }
+
+        await _db.SaveChangesAsync();
+
+        _cache.Remove(PriceCacheKey);
+    }
 
     // ---------------- Config ----------------
     private string MerchantKey =>
@@ -229,7 +324,9 @@ public class SubscriptionService : ISubscriptionService
         string backendBaseUrl,
         string? frontendOrigin)
     {
-        var plan = FindPlan(planKey)
+        // Price yahan DB (admin ki set ki hui) se aati hai
+        var plan = (await GetPlansAsync()).FirstOrDefault(p =>
+                string.Equals(p.Key, planKey?.Trim(), StringComparison.OrdinalIgnoreCase))
             ?? throw new ArgumentException("Please choose a valid plan.");
 
         if (string.IsNullOrWhiteSpace(MerchantKey) ||

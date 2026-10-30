@@ -60,7 +60,11 @@ public class PayUCallbackResult
 
 public interface ISubscriptionService
 {
-    IReadOnlyList<SubscriptionPlan> Plans { get; }
+    // Plans ki abhi ki price (admin ne badli ho to wahi, warna default)
+    Task<IReadOnlyList<SubscriptionPlan>> GetPlansAsync();
+
+    // Admin: plan ka price badlo (paise me). Sirf naye payments par lagta hai.
+    Task SetPlanPriceAsync(string planKey, int amountPaise, string? updatedBy);
 
     Task<SubscriptionStatus> GetStatusAsync(int userId);
 

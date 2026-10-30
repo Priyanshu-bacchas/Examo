@@ -37,6 +37,8 @@ public class SubscriptionController : ControllerBase
 
         var status = await _service.GetStatusAsync(userId);
 
+        var plans = await _service.GetPlansAsync();
+
         var payments = await _context.Payments
             .AsNoTracking()
             .Where(x => x.UserId == userId && x.Status == "Paid")
@@ -63,7 +65,7 @@ public class SubscriptionController : ControllerBase
             status.PlanName,
             status.EndsAt,
             status.DaysLeft,
-            plans = _service.Plans.Select(p => new
+            plans = plans.Select(p => new
             {
                 p.Key,
                 p.Name,
