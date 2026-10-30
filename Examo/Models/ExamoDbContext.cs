@@ -45,6 +45,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<SubscriptionPlanPrice> PlanPrices { get; set; }
 
+    public virtual DbSet<AppSetting> AppSettings { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {

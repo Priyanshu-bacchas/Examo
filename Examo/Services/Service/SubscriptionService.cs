@@ -25,7 +25,11 @@ namespace Examo.Services;
 //   RazorpayPaymentId = PayU mihpayid
 public class SubscriptionService : ISubscriptionService
 {
-    public const int TrialDays = 2;
+    // Admin ne trial ke din set nahi kiye to ye chalta hai
+    public const int DefaultTrialDays = 2;
+
+    private const string TrialSettingKey = "trial-days";
+    private const string TrialCacheKey = "trial-days";
 
     private const string PriceCacheKey = "plan-prices";
 
@@ -152,6 +156,71 @@ public class SubscriptionService : ISubscriptionService
         _cache.Remove(PriceCacheKey);
     }
 
+    // ---------------- Free trial (admin set karta hai) ----------------
+
+    public async Task<int> GetTrialDaysAsync()
+    {
+        if (_cache.TryGetValue(TrialCacheKey, out int cached))
+            return cached;
+
+        try
+        {
+            var row = await _db.AppSettings
+                .AsNoTracking()
+                .FirstOrDefaultAsync(x => x.Key == TrialSettingKey);
+
+            var days = row != null &&
+                       int.TryParse(row.Value, out var parsed) &&
+                       parsed >= 0 && parsed <= 90
+                ? parsed
+                : DefaultTrialDays;
+
+            _cache.Set(TrialCacheKey, days, TimeSpan.FromMinutes(2));
+
+            return days;
+        }
+        catch (Exception ex)
+        {
+            // Table abhi na ho to default se kaam chalta rahe
+            _logger.LogError(ex, "Trial days could not be loaded.");
+
+            return DefaultTrialDays;
+        }
+    }
+
+    public async Task SetTrialDaysAsync(int days, string? updatedBy)
+    {
+        if (days < 0 || days > 90)
+        {
+            throw new ArgumentException(
+                "Trial must be between 0 and 90 days.");
+        }
+
+        var row = await _db.AppSettings
+            .FirstOrDefaultAsync(x => x.Key == TrialSettingKey);
+
+        if (row == null)
+        {
+            _db.AppSettings.Add(new AppSetting
+            {
+                Key = TrialSettingKey,
+                Value = days.ToString(CultureInfo.InvariantCulture),
+                UpdatedAt = DateTime.UtcNow,
+                UpdatedBy = updatedBy
+            });
+        }
+        else
+        {
+            row.Value = days.ToString(CultureInfo.InvariantCulture);
+            row.UpdatedAt = DateTime.UtcNow;
+            row.UpdatedBy = updatedBy;
+        }
+
+        await _db.SaveChangesAsync();
+
+        _cache.Remove(TrialCacheKey);
+    }
+
     // ---------------- Config ----------------
     private string MerchantKey =>
         First(_config["PayU:Key"],
@@ -269,7 +338,10 @@ public class SubscriptionService : ISubscriptionService
         // Trial pehli baar check hote hi shuru hota hai
         if (student.TrialEndsAt == null)
         {
-            student.TrialEndsAt = now.AddDays(TrialDays);
+            var trialDays = await GetTrialDaysAsync();
+
+            student.TrialStartsAt = now;
+            student.TrialEndsAt = now.AddDays(trialDays);
             await _db.SaveChangesAsync();
         }
 

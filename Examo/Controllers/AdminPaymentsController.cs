@@ -45,6 +45,8 @@ public class AdminPaymentsController : ControllerBase
 
         var plans = await _subscriptions.GetPlansAsync();
 
+        var trialDays = await _subscriptions.GetTrialDaysAsync();
+
         var students = await _context.Students
             .AsNoTracking()
             .Where(x => x.Role != "Admin")
@@ -54,6 +56,7 @@ public class AdminPaymentsController : ControllerBase
                 x.Name,
                 x.Email,
                 x.MobileNumber,
+                x.TrialStartsAt,
                 x.TrialEndsAt
             })
             .ToListAsync();
@@ -89,10 +92,12 @@ public class AdminPaymentsController : ControllerBase
                     s.Name,
                     s.Email,
                     s.MobileNumber,
+                    s.TrialStartsAt,
                     s.TrialEndsAt,
                     mine ?? new List<UserSubscription>(),
                     paise,
                     plans,
+                    trialDays,
                     now);
             })
             .ToList();
@@ -399,6 +404,48 @@ public class AdminPaymentsController : ControllerBase
         return Ok(new { message = "Price updated." });
     }
 
+    // =====================================================
+    // GET /api/Admin/payments/trial       ->  { days }
+    // PUT /api/Admin/payments/trial       { days }   (0 = free trial band)
+    // =====================================================
+    [HttpGet("trial")]
+    public async Task<IActionResult> GetTrial()
+    {
+        return Ok(new { days = await _subscriptions.GetTrialDaysAsync() });
+    }
+
+    public class UpdateTrialRequest
+    {
+        public int Days { get; set; }
+    }
+
+    [HttpPut("trial")]
+    public async Task<IActionResult> UpdateTrial(
+        [FromBody] UpdateTrialRequest request)
+    {
+        if (request.Days < 0 || request.Days > 90)
+        {
+            return BadRequest(new
+            {
+                message = "Trial must be between 0 and 90 days."
+            });
+        }
+
+        var oldDays = await _subscriptions.GetTrialDaysAsync();
+
+        var admin =
+            User.FindFirstValue(ClaimTypes.Email)
+            ?? User.FindFirstValue(ClaimTypes.Name);
+
+        await _subscriptions.SetTrialDaysAsync(request.Days, admin);
+
+        Audit(
+            "Update Free Trial",
+            $"Trial: {oldDays} days to {request.Days} days");
+
+        return Ok(new { message = "Trial updated." });
+    }
+
     // ---------------- Helpers ----------------
 
     private async Task<SubscriptionPlan?> FindPlanAsync(string? key)
@@ -489,10 +536,12 @@ public class AdminPaymentsController : ControllerBase
         string name,
         string email,
         string? mobile,
+        DateTime? trialStartsAt,
         DateTime? trialEndsAt,
         List<UserSubscription> subs,
         long paidPaise,
         IReadOnlyList<SubscriptionPlan> plans,
+        int trialDays,
         DateTime now)
     {
         string? NameOf(string? key) =>
@@ -532,7 +581,7 @@ public class AdminPaymentsController : ControllerBase
         {
             row.Status = "Trial";
             row.PlanName = "Free Trial";
-            row.StartsAt = trialEndsAt.Value.AddDays(-SubscriptionService.TrialDays);
+            row.StartsAt = trialStartsAt ?? trialEndsAt.Value.AddDays(-trialDays);
             row.EndsAt = trialEndsAt;
             row.DaysLeft = DaysUntil(trialEndsAt.Value, now);
 
@@ -556,7 +605,7 @@ public class AdminPaymentsController : ControllerBase
         {
             row.Status = "Expired";
             row.PlanName = "Free Trial";
-            row.StartsAt = trialEndsAt.Value.AddDays(-SubscriptionService.TrialDays);
+            row.StartsAt = trialStartsAt ?? trialEndsAt.Value.AddDays(-trialDays);
             row.EndsAt = trialEndsAt;
 
             return row;

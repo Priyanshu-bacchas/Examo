@@ -66,6 +66,12 @@ public interface ISubscriptionService
     // Admin: plan ka price badlo (paise me). Sirf naye payments par lagta hai.
     Task SetPlanPriceAsync(string planKey, int amountPaise, string? updatedBy);
 
+    // Free trial kitne din ka hai (admin ne badla ho to wahi, warna 2)
+    Task<int> GetTrialDaysAsync();
+
+    // Admin: trial ke din badlo (0 = trial band). Sirf un users par lagta hai jinka trial abhi shuru nahi hua.
+    Task SetTrialDaysAsync(int days, string? updatedBy);
+
     Task<SubscriptionStatus> GetStatusAsync(int userId);
 
     // backendBaseUrl : PayU is URL par surl/furl ke liye wapas aayega
