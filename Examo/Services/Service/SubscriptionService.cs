@@ -660,7 +660,55 @@ public class SubscriptionService : ISubscriptionService
 
         await _db.SaveChangesAsync();
 
+        await CreatePurchaseNotificationAsync(payment, plan, end, now);
+
         await SendPaymentEmailAsync(payment, plan, payuPaymentId, end);
+    }
+
+    // Student ki Notifications me "Subscription activated" aati hai.
+    // Email alag se (payment receipt) ja chuki hoti hai, isliye yahan EmailSent = true.
+    private async Task CreatePurchaseNotificationAsync(
+        Payment payment,
+        SubscriptionPlan plan,
+        DateTime endsAt,
+        DateTime now)
+    {
+        var item = new Notification
+        {
+            UserId = payment.UserId,
+            Type = "sub-start",
+            Title = $"Subscription activated: {plan.Name}",
+            Message =
+                $"Thank you! Your {plan.Name} is active till " +
+                $"{LocalDateText(endsAt)}. Enjoy full access to Examo.",
+            ExamName = null,
+            DedupeKey = $"sub-start:{payment.Id}",
+            IsRead = false,
+            EmailSent = true,
+            CreatedAt = now
+        };
+
+        try
+        {
+            _db.Notifications.Add(item);
+            await _db.SaveChangesAsync();
+        }
+        catch (Exception ex)
+        {
+            // Notification na bane to bhi payment / plan par asar nahi
+            _db.Entry(item).State = EntityState.Detached;
+
+            _logger.LogError(ex, "Subscription notification could not be saved.");
+        }
+    }
+
+    private string LocalDateText(DateTime utc)
+    {
+        var offset = _config.GetValue("Notifications:UtcOffsetMinutes", 330);
+
+        return utc
+            .AddMinutes(offset)
+            .ToString("d MMM yyyy", CultureInfo.InvariantCulture);
     }
 
     private async Task SendPaymentEmailAsync(

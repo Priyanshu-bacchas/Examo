@@ -16,6 +16,10 @@ public class NotificationService : INotificationService
     public const string TypeExamDay = "exam-day";
     public const string TypeResult = "result";
 
+    // Subscription: sub-start = plan chalu hua (SubscriptionService banata hai)
+    public const string TypeSubEve = "sub-eve";       // khatam hone se 1 din pehle
+    public const string TypeSubEnd = "sub-end";       // khatam hone wale din (usi din)
+
     private readonly ExamoDbContext _context;
     private readonly ICurrentUserService _currentUser;
     private readonly IEmailService _emailService;
@@ -295,6 +299,10 @@ public class NotificationService : INotificationService
                 date.DayNumber - today.DayNumber));
         }
 
+        // ---- 3. Subscription: khatam hone se 1 din pehle aur usi din ----
+        candidates.AddRange(
+            await BuildSubscriptionRemindersAsync(today, cancellationToken));
+
         if (candidates.Count == 0)
             return new NotificationRunSummary(0, 0, false);
 
@@ -486,6 +494,84 @@ public class NotificationService : INotificationService
             "Time to revise!",
             name,
             $"exam-week:{id}:{stamp}");
+    }
+
+    private static string PlanLabel(string key) =>
+        key.ToLowerInvariant() switch
+        {
+            "monthly" => "Monthly Plan",
+            "yearly" => "Yearly Plan",
+            _ => key
+        };
+
+    // Har student ka sabse aakhri subscription dekhta hai (date India ke time se):
+    //   - kal khatam hoga  -> "ends tomorrow"  (notification + email)
+    //   - aaj khatam hoga  -> "ends today"     (notification + email)
+    //     (subah ki reminder ke time plan khatam ho chuka ho to "ended today")
+    // Naya plan le liya ho to last EndsAt aage chala jaata hai, isliye reminder nahi banta.
+    // Purani expiry (pehle ke din) par kuch nahi bhejte.
+    private async Task<List<Candidate>> BuildSubscriptionRemindersAsync(
+        DateOnly today,
+        CancellationToken cancellationToken)
+    {
+        var now = DateTime.UtcNow;
+
+        var rows = await _context.UserSubscriptions
+            .AsNoTracking()
+            .Where(x => x.EndsAt > now.AddDays(-2))
+            .Select(x => new { x.UserId, x.PlanKey, x.EndsAt })
+            .ToListAsync(cancellationToken);
+
+        var list = new List<Candidate>();
+
+        foreach (var group in rows.GroupBy(x => x.UserId))
+        {
+            var last = group.OrderByDescending(x => x.EndsAt).First();
+
+            var endDate = DateOnly.FromDateTime(
+                last.EndsAt.AddMinutes(UtcOffsetMinutes));
+
+            var daysLeft = endDate.DayNumber - today.DayNumber;
+
+            var stamp = last.EndsAt.ToString("yyyyMMddHHmm");
+            var plan = PlanLabel(last.PlanKey);
+            var dateText = FormatDate(endDate);
+
+            if (daysLeft == 1)
+            {
+                list.Add(new Candidate(
+                    group.Key,
+                    TypeSubEve,
+                    $"Subscription ends tomorrow: {plan}",
+                    $"Your {plan} ends tomorrow ({dateText}). " +
+                    "Log in to Examo and renew it from the Subscription page " +
+                    "to keep full access without a break.",
+                    null,
+                    $"sub-eve:{stamp}"));
+            }
+            else if (daysLeft == 0)
+            {
+                var ended = last.EndsAt <= now;
+
+                list.Add(new Candidate(
+                    group.Key,
+                    TypeSubEnd,
+                    ended
+                        ? $"Subscription ended today: {plan}"
+                        : $"Subscription ends today: {plan}",
+                    ended
+                        ? $"Your {plan} ended today ({dateText}). Only Help and " +
+                          "Subscription are open right now. Log in to Examo and " +
+                          "renew it from the Subscription page to unlock everything."
+                        : $"Your {plan} ends today ({dateText}). Log in to Examo " +
+                          "and renew it from the Subscription page, otherwise only " +
+                          "Help and Subscription will stay open.",
+                    null,
+                    $"sub-end:{stamp}"));
+            }
+        }
+
+        return list;
     }
 
     // Notification save karta hai. Duplicate (unique index) ho to null deta hai.
