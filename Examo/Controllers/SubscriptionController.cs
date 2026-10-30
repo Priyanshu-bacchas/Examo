@@ -65,6 +65,7 @@ public class SubscriptionController : ControllerBase
             status.PlanName,
             status.EndsAt,
             status.DaysLeft,
+            trialDays = await _service.GetTrialDaysAsync(),
             plans = plans.Select(p => new
             {
                 p.Key,

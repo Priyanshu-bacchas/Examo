@@ -33,6 +33,10 @@ public class Student
     [JsonIgnore]
     public DateTime? TrialEndsAt { get; set; }
 
+    // Trial kab shuru hua (admin ne baad me trial ke din badle ho tab bhi sahi dikhe)
+    [JsonIgnore]
+    public DateTime? TrialStartsAt { get; set; }
+
     // =====================================================
     // EMAIL OTP (verification + forgot password)
     // =====================================================
