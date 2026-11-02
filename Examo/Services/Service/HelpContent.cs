@@ -33,13 +33,37 @@ public static class HelpContent
         {
             Id = 1,
             Category = "Student Basics",
-            Question = "How to set up my student profile?",
-            Answer = "Sign up, verify your email with the 6-digit code and you will land on your Dashboard. Your name, email and mobile number come from your signup details. Then use the Student menu in the sidebar (Exam Forms, Exams, Preparation, Results, Subjects, Schedule, Documents) to add your own data. Everything you add is visible only to your account.",
-            Keywords = "profile setup account start begin dashboard name details register signup new"
+            Question = "How to use this website?",
+            Answer = "Examo helps you track government exam forms, deadlines, preparation and results in one place. 1) Sign up, verify your email and log in. 2) Open Jobs (sidebar > Opportunities) and look at Latest Jobs. 3) Click 'Add to ExamForm' on the exam you want to apply for. It is added to Exam Forms, Exams, Preparation and Results automatically. 4) Open Student > Exam Forms, click 'Open' to fill the form on the official website, then change its status from Pending to Filled. 5) Use Student > Preparation, Subjects and Schedule to plan your study, and Documents to keep your files. 6) After the exam, update your result in Student > Results. 7) Notifications remind you before every last date and exam date.",
+            Keywords = "use website how to use guide tutorial steps start begin process flow work working works overview basics app examo explain kaise kaam istemal chalaye shuru"
         },
         new Entry
         {
             Id = 2,
+            Category = "General",
+            Question = "What is Examo?",
+            Answer = "Examo is a student management app for government exam aspirants. You can find the latest jobs, add them to your own Exam Forms, track exam dates, preparation, results, subjects, study schedule and documents, and get reminders before important dates.",
+            Keywords = "what is examo about app website purpose features aspirants government exam sarkari naukri kya hai"
+        },
+        new Entry
+        {
+            Id = 3,
+            Category = "Student Basics",
+            Question = "How to set up my student profile?",
+            Answer = "Sign up, verify your email with the 6-digit code and you will land on your Dashboard. Your name, email and mobile number come from your signup details, so there is nothing else to set up. Everything you add or track is visible only to your account.",
+            Keywords = "profile setup account start begin dashboard name details register signup new"
+        },
+        new Entry
+        {
+            Id = 4,
+            Category = "Student Basics",
+            Question = "What does the Dashboard show?",
+            Answer = "Your Dashboard gives a quick summary of Upcoming Exams, Subjects, Study Sessions and Exam Forms, along with a calendar so you can see your important dates at a glance.",
+            Keywords = "dashboard home summary overview calendar upcoming exams study sessions count cards main page"
+        },
+        new Entry
+        {
+            Id = 5,
             Category = "Student Basics",
             Question = "How to add subjects and schedules?",
             Answer = "Subjects: go to Student > Subjects, click Add, then enter the subject name, status (Not Started, In Progress or Completed), number of lectures, notes/materials, a link and an optional PDF. Schedules: go to Student > Schedule, choose the subject, date and start time (end time is optional) and add a short description.",
@@ -47,7 +71,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 3,
+            Id = 6,
             Category = "Student Basics",
             Question = "How to upload my documents?",
             Answer = "Go to Student > Documents and upload your file. You can upload photos (JPG, PNG, WEBP) and PDF files up to 10 MB each. Give the document a name so it is easy to find later. Your documents are private to your account.",
@@ -55,31 +79,143 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 4,
+            Id = 7,
             Category = "Exam Enrollment",
-            Question = "How do I fill an exam form?",
-            Answer = "Go to Student > Exam Forms and add the exam name, registration start and end dates, the official form link and its status (Pending or Filled). Examo tracks your forms and deadlines; the actual form is filled on the exam's official website using the link you saved. Once submitted, change the status to Filled.",
-            Keywords = "exam form forms apply application registration deadline last date link filled pending enroll enrollment"
+            Question = "How do I add an exam form?",
+            Answer = "Exam forms are added from the Jobs page, not typed in by hand. 1) Go to Jobs (sidebar > Opportunities) and open the Latest Jobs tab. 2) Click 'Watch' under Details if you want to see a video about the job. 3) Click 'Add to ExamForm' next to the exam. The exam is added to Student > Exam Forms (Pending), Exams (Coming Soon), Preparation (Not Started) and Results (Awaited) in one go, and the button changes to 'Added'.",
+            Keywords = "add exam form examform job jobs apply application new latest jobs button create fill bharna form kaise add to examform naukri vacancy"
         },
         new Entry
         {
-            Id = 5,
+            Id = 8,
+            Category = "Exam Enrollment",
+            Question = "How do I change my exam form status?",
+            Answer = "Go to Student > Exam Forms. Click 'Open' in the Link column to fill the form on the official website. After you have submitted it, click Edit on that row and change the status from Pending to Filled. Only the status can be changed; the exam name and dates come from the job.",
+            Keywords = "change update status exam form filled pending edit mark submitted fill link open official website form status badle badlo"
+        },
+        new Entry
+        {
+            Id = 9,
+            Category = "Exam Enrollment",
+            Question = "Can I add an exam form manually?",
+            Answer = "No. To keep your data correct, Exam Forms, Exams, Preparation and Results are created only from the Jobs page. If an exam you want is not listed in Jobs yet, please check again later or tell us through Contact Us and we will look into it.",
+            Keywords = "manually manual add own type enter create custom missing listed available job found exam not in jobs hand"
+        },
+        new Entry
+        {
+            Id = 10,
+            Category = "Exam Enrollment",
+            Question = "Why can't I add a job to my Exam Forms?",
+            Answer = "The 'Add to ExamForm' button works only when the last date of the job has not passed, your free trial or paid plan is active, and you have not already added it (then it shows 'Added'). If your plan has ended, open Subscription and choose a plan.",
+            Keywords = "cannot cant unable button disabled added last date passed expired plan trial error not working greyed"
+        },
+        new Entry
+        {
+            Id = 11,
+            Category = "Exam Enrollment",
+            Question = "What are the Jobs, Admit Card and Results tabs?",
+            Answer = "The Jobs page has three tabs. Latest Jobs lists new notifications with the start date, last date and an 'Add to ExamForm' button. Admit Card lists the latest admit cards and Results lists the latest declared results; use 'Open' to go to the official page and 'Watch' for a video when available. A tag like '1 day left' warns you when a last date is near.",
+            Keywords = "jobs tab tabs latest admit card hall ticket result open watch video details last date left opportunities"
+        },
+        new Entry
+        {
+            Id = 12,
             Category = "Exam Enrollment",
             Question = "Where can I track my exam dates?",
-            Answer = "Open Student > Exams to see every exam with its date and status (for example Coming Soon). Use Student > Schedule to plan your daily study slots before each exam.",
-            Keywords = "exam exams date dates track calendar upcoming when coming soon timetable"
+            Answer = "Open Student > Exams to see every exam you added with its date and status (Coming Soon or Done). You can change the status with Edit. Use Student > Schedule to plan your daily study slots and your Dashboard calendar to see dates at a glance.",
+            Keywords = "exam exams date dates track calendar upcoming when coming soon done timetable"
         },
         new Entry
         {
-            Id = 6,
+            Id = 13,
+            Category = "Exam Enrollment",
+            Question = "How do I track my exam preparation?",
+            Answer = "Exams you add from Jobs appear in Student > Preparation automatically with their syllabus. Set the status to Not Started, In Progress or Completed with Edit as you move ahead.",
+            Keywords = "preparation prepare syllabus progress status study track exam not started in progress completed"
+        },
+        new Entry
+        {
+            Id = 14,
             Category = "Exam Enrollment",
             Question = "How to check my results?",
-            Answer = "Go to Student > Results. Exams from your Exam Forms appear there automatically. Once your result is declared on the official website, set it here to Qualified or Not Qualified (it stays Awaited until then).",
-            Keywords = "result results qualified awaited declared score rank marks check status"
+            Answer = "Student > Results lists every exam you added and shows Awaited until the result is declared on the official website. After that, click Edit and set it to Qualified or Not Qualified. You can also see the latest declared results in Jobs > Results.",
+            Keywords = "result results qualified not qualified awaited declared score rank marks check status"
         },
         new Entry
         {
-            Id = 7,
+            Id = 15,
+            Category = "General",
+            Question = "What are Notifications and reminders?",
+            Answer = "Notifications remind you about your Pending exam forms (a week before, a day before and on the last date) and about your upcoming exams (a week before, a day before and on the exam day). Once you mark a form as Filled, its reminders stop. Open Notifications in the sidebar to read or delete them.",
+            Keywords = "notification notifications reminder reminders alert alerts remind last date email bell"
+        },
+        new Entry
+        {
+            Id = 16,
+            Category = "Subscription",
+            Question = "How does the free trial work?",
+            Answer = "New users get a free trial with full access. When the trial ends, only the Help and Subscription pages stay open until you choose a plan. You can see your trial end date on the Subscription page.",
+            Keywords = "free trial basic plan days start new user expired ended locked access trial kitne din"
+        },
+        new Entry
+        {
+            Id = 17,
+            Category = "Subscription",
+            Question = "How much does Examo cost?",
+            Answer = "Examo has a free trial, then a Monthly plan and a Yearly plan. The current prices are always shown on the Subscription page.",
+            Keywords = "cost price pricing fee charges how much rate monthly yearly plan kitna paisa"
+        },
+        new Entry
+        {
+            Id = 18,
+            Category = "Subscription",
+            Question = "What payment methods are accepted?",
+            Answer = "We accept UPI, debit cards, credit cards and net banking for all paid plans. Payments are processed securely by PayU.",
+            Keywords = "payment pay upi card debit credit net banking methods payu secure"
+        },
+        new Entry
+        {
+            Id = 19,
+            Category = "Subscription",
+            Question = "How do I buy or renew a plan?",
+            Answer = "Open Subscription from the sidebar and click the Monthly or Yearly plan. You will go to the secure PayU page and, after paying, you are brought back to Examo with your plan active. Plans are one-time payments and do not renew automatically. If you buy again while a plan is running, the new days are added after the current end date.",
+            Keywords = "buy purchase renew extend upgrade plan subscription how pay monthly yearly activate payment"
+        },
+        new Entry
+        {
+            Id = 20,
+            Category = "Subscription",
+            Question = "How can I change or cancel my plan?",
+            Answer = "There is no auto-renewal, so nothing needs to be cancelled: your plan simply ends on its end date. To continue, buy a plan again from the Subscription page.",
+            Keywords = "plan change cancel subscription monthly yearly basic downgrade stop auto renew refund"
+        },
+        new Entry
+        {
+            Id = 21,
+            Category = "Subscription",
+            Question = "How do I check when my plan ends?",
+            Answer = "Open Subscription. Under Your Subscription Details you can see your status, your plan and the 'Valid Till' date (or the trial end date if you are on the free trial).",
+            Keywords = "plan ends end date valid till expiry expire when status active check validity days left"
+        },
+        new Entry
+        {
+            Id = 22,
+            Category = "Subscription",
+            Question = "How do I download my payment receipt?",
+            Answer = "Go to Subscription > Previous Payments and click Download next to the payment. You get a colourful payment slip image (PNG) with the amount, plan start date, plan end date, payment ID and transaction ID.",
+            Keywords = "receipt invoice payment download bill previous payments slip proof"
+        },
+        new Entry
+        {
+            Id = 23,
+            Category = "Subscription",
+            Question = "My payment was deducted but my plan is not active",
+            Answer = "Please wait a few minutes and refresh the Subscription page, because confirmation can take a short while. If your plan is still not active, send us a message through Contact Us with your registered email, the payment ID or transaction ID and the date of payment.",
+            Keywords = "payment deducted money cut debited plan not active failed pending paid but not working stuck refund problem"
+        },
+        new Entry
+        {
+            Id = 24,
             Category = "Technical Issues",
             Question = "I can't log in to my account",
             Answer = "Please check these in order: 1) Use the same email (or mobile number) and password you signed up with. 2) After the password, we email a 6-digit login code. Check your Spam/Promotions folder, and use 'Resend code' after 60 seconds if needed. 3) If your email was never verified, we send a verification code instead. 4) Forgot your password? Click 'Forgot Password?' on the login page. 5) You can also use 'Continue with Google' if you signed up with the same Google email. Still stuck? Please contact our support team with your registered email.",
@@ -87,7 +223,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 8,
+            Id = 25,
             Category = "Account & Login",
             Question = "How to reset my password?",
             Answer = "On the login page click 'Forgot Password?', enter your registered email and we will send a 6-digit code. Enter the code, choose a new password and log in with it. The code is valid for 10 minutes.",
@@ -95,7 +231,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 9,
+            Id = 26,
             Category = "Account & Login",
             Question = "I did not receive the OTP / verification code",
             Answer = "Check your Spam and Promotions folders first and make sure the email address is spelled correctly. Wait 60 seconds and press 'Resend code'. Only the latest code works, it expires in 10 minutes, and after 5 wrong attempts you need to request a new one. If nothing arrives after a couple of tries, please contact our support team.",
@@ -103,7 +239,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 10,
+            Id = 27,
             Category = "Account & Login",
             Question = "Why do I get a code every time I log in?",
             Answer = "To keep your account safe, we confirm each login with a one-time code sent to your email, so nobody can get in with only your password. Logging in with 'Continue with Google' does not need this extra code.",
@@ -111,7 +247,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 11,
+            Id = 28,
             Category = "Account & Login",
             Question = "How does Continue with Google work?",
             Answer = "Click 'Continue with Google' on the login page and pick your Google account. If you are new, your Examo account is created automatically; if you already have one with the same email, you are simply logged in. Make sure your browser allows popups for this site.",
@@ -119,7 +255,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 12,
+            Id = 29,
             Category = "Technical Issues",
             Question = "My document upload is failing",
             Answer = "Please check that: the file is a JPG, PNG, WEBP or PDF; it is 10 MB or smaller; and it is a real file of that type (renamed files are rejected). Also check your internet connection and try again. If it still fails, please contact our support team with the file type and size.",
@@ -127,7 +263,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 13,
+            Id = 30,
             Category = "Technical Issues",
             Question = "The page is not loading properly",
             Answer = "If the site has not been used for a while, the first load can take up to a minute because the server needs to wake up. Wait a moment and refresh. You can also try a hard refresh (Ctrl + Shift + R), another browser, or check your internet connection. If you see 'Failed to fetch', wait a minute and try again. If the problem continues, please contact our support team with a screenshot.",
@@ -135,47 +271,15 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 14,
-            Category = "Student Basics",
-            Question = "How do I track my exam preparation?",
-            Answer = "Go to Student > Preparation, add the exam name and its syllabus, and set the status to Not Started, In Progress or Completed as you move ahead.",
-            Keywords = "preparation prepare syllabus progress status study track exam"
-        },
-        new Entry
-        {
-            Id = 15,
-            Category = "Subscription",
-            Question = "What payment methods are accepted?",
-            Answer = "We accept UPI, debit cards, credit cards and net banking for all paid plans.",
-            Keywords = "payment pay upi card debit credit net banking methods price cost fee"
-        },
-        new Entry
-        {
-            Id = 16,
-            Category = "Subscription",
-            Question = "How can I change or cancel my plan?",
-            Answer = "Open the Subscription page from the sidebar. You can switch between the Monthly and Yearly plans, or go back to the Basic plan anytime.",
-            Keywords = "plan change cancel subscription monthly yearly basic upgrade downgrade premium"
-        },
-        new Entry
-        {
-            Id = 17,
-            Category = "Subscription",
-            Question = "How do I download my payment receipt?",
-            Answer = "Go to Subscription > Previous Payments and click the Download button next to the payment.",
-            Keywords = "receipt invoice payment download bill previous payments"
-        },
-        new Entry
-        {
-            Id = 18,
+            Id = 31,
             Category = "Account & Login",
             Question = "Is my data and uploaded documents safe?",
-            Answer = "Yes. Your exams, subjects, schedules and documents are visible only to your account, and every login is protected with an email code.",
+            Answer = "Yes. Your exam forms, exams, subjects, schedules and documents are visible only to your account, and every login is protected with an email code.",
             Keywords = "data safe security privacy private secure documents protected visible"
         },
         new Entry
         {
-            Id = 19,
+            Id = 32,
             Category = "Account & Login",
             Question = "How do I change my email or mobile number?",
             Answer = "You cannot change these yourself yet. Please contact our support team with your registered email and the new details.",
@@ -183,7 +287,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 20,
+            Id = 33,
             Category = "Account & Login",
             Question = "How do I delete my account?",
             Answer = "Please contact our support team using your registered email and ask for account deletion.",
@@ -191,7 +295,7 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 21,
+            Id = 34,
             Category = "Account & Login",
             Question = "My account is blocked",
             Answer = "An account can be blocked by an administrator. Please contact our support team with your registered email.",
@@ -199,19 +303,11 @@ public static class HelpContent
         },
         new Entry
         {
-            Id = 22,
-            Category = "General",
-            Question = "What are Jobs and Notifications?",
-            Answer = "Jobs and Notifications are coming soon. We will let you know as soon as they are available.",
-            Keywords = "jobs job notifications notification alerts coming soon opportunities vacancy"
-        },
-        new Entry
-        {
-            Id = 23,
+            Id = 35,
             Category = "General",
             Question = "How do I contact support?",
-            Answer = "Use the Contact Us section on this page and mention your registered email address so that we can find your account.",
-            Keywords = "contact support help query question complaint feedback team reply ticket message"
+            Answer = "Use the Contact Us form on the Help page (or ask the Examo Assistant first) and mention your registered email address so that we can find your account. You can also email us at examoaspirant@gmail.com.",
+            Keywords = "contact support help query question complaint feedback team reply ticket message email talk human"
         }
     };
 
@@ -224,8 +320,8 @@ public static class HelpContent
             Tone = "mint",
             Links = new()
             {
-                "How to set up my student profile?",
-                "How to add subjects and schedules?",
+                "How to use this website?",
+                "What does the Dashboard show?",
                 "How to upload my documents?"
             }
         },
@@ -235,8 +331,8 @@ public static class HelpContent
             Tone = "lavender",
             Links = new()
             {
-                "How do I fill an exam form?",
-                "Where can I track my exam dates?",
+                "How do I add an exam form?",
+                "How do I change my exam form status?",
                 "How to check my results?"
             }
         },
