@@ -87,6 +87,9 @@ public class SupportMessageDto
     public DateTime? RepliedAt { get; set; }
 
     public string? RepliedBy { get; set; }
+
+    // true = admin ne abhi tak dekha nahi (frontend par "New" badge)
+    public bool IsNew { get; set; }
 }
 
 public class SupportMessageStatsDto

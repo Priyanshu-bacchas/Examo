@@ -144,7 +144,7 @@ public class HelpController : ControllerBase
             _context,
             AdminNotificationWriter.TypeSupport,
             $"New help message: {subject}",
-            $"{name} ({email}) sent a message: {Preview(message)}",
+            $"{name} ({email}) sent a message.",
             userId,
             name,
             email,
@@ -161,19 +161,6 @@ public class HelpController : ControllerBase
         {
             Message = "Your message has been submitted successfully."
         });
-    }
-
-    // Notification me message ka chhota hissa
-    private static string Preview(string text)
-    {
-        var clean = (text ?? string.Empty)
-            .Replace("\r", " ")
-            .Replace("\n", " ")
-            .Trim();
-
-        return clean.Length <= 160
-            ? clean
-            : clean[..160] + "...";
     }
 
     // =====================================================
@@ -227,6 +214,22 @@ public class HelpController : ControllerBase
             })
             .ToListAsync();
 
+        // "New" badge: wahi source jo NotifyMe me hai.
+        // Jis message ki NotifyMe notification abhi unread hai, wo New hai.
+        var newIds = await _context.AdminNotifications
+            .AsNoTracking()
+            .Where(x =>
+                x.Type == AdminNotificationWriter.TypeSupport &&
+                !x.IsRead &&
+                x.RefId != null)
+            .Select(x => x.RefId!.Value)
+            .ToListAsync();
+
+        var newSet = newIds.ToHashSet();
+
+        foreach (var item in items)
+            item.IsNew = newSet.Contains(item.Id);
+
         // Top cards ke liye totals (filter se independent)
         var last7Days = DateTime.UtcNow.AddDays(-7);
 
@@ -247,6 +250,51 @@ public class HelpController : ControllerBase
             Stats = stats,
             Items = items
         });
+    }
+
+    // PUT /api/Help/messages/5/seen  ->  admin ne message khola: "New" badge hat jata hai
+    [HttpPut("messages/{id:int}/seen")]
+    [Authorize(Roles = "Admin")]
+    public async Task<IActionResult> MarkSeen(int id)
+    {
+        // Sirf "dekha" hai, isliye Logs & Security me entry nahi banti
+        HttpContext.Items[AuditLogFilter.SkipKey] = true;
+
+        var item = await _context.SupportMessages
+            .FirstOrDefaultAsync(x => x.Id == id);
+
+        if (item == null)
+            return NotFound(new { message = "Message not found." });
+
+        if (!item.AdminSeen)
+        {
+            item.AdminSeen = true;
+
+            await _context.SaveChangesAsync();
+        }
+
+        await MarkNotifyReadAsync(id);
+
+        return Ok(new { message = "Seen." });
+    }
+
+    // Is message ki NotifyMe notification bhi "read" ho jaye
+    private async Task MarkNotifyReadAsync(int supportId)
+    {
+        try
+        {
+            await _context.AdminNotifications
+                .Where(x =>
+                    x.Type == AdminNotificationWriter.TypeSupport &&
+                    x.RefId == supportId &&
+                    !x.IsRead)
+                .ExecuteUpdateAsync(s =>
+                    s.SetProperty(x => x.IsRead, true));
+        }
+        catch
+        {
+            // NotifyMe update fail hone se asli kaam nahi rukta
+        }
     }
 
     // PUT /api/Help/messages/5/status   body: { "status": "Resolved" }
@@ -279,8 +327,11 @@ public class HelpController : ControllerBase
 
         item.Status = resolved ? StatusResolved : StatusOpen;
         item.ResolvedAt = resolved ? DateTime.UtcNow : null;
+        item.AdminSeen = true;
 
         await _context.SaveChangesAsync();
+
+        await MarkNotifyReadAsync(id);
 
         HttpContext.Items[AuditLogFilter.ActionKey] =
             "Update Support Message";
@@ -351,6 +402,7 @@ public class HelpController : ControllerBase
         item.AdminReply = reply;
         item.RepliedAt = DateTime.UtcNow;
         item.RepliedBy = adminName;
+        item.AdminSeen = true;
 
         if (dto.MarkResolved)
         {
@@ -359,6 +411,8 @@ public class HelpController : ControllerBase
         }
 
         await _context.SaveChangesAsync();
+
+        await MarkNotifyReadAsync(id);
 
         HttpContext.Items[AuditLogFilter.ActionKey] =
             "Reply Support Message";

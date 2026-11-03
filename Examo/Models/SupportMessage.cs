@@ -30,4 +30,7 @@ public class SupportMessage
 
     // Kis admin ne reply kiya (naam)
     public string? RepliedBy { get; set; }
+
+    // Admin ne ye message khola / dekha hai ya nahi (false = Help & Support me "New" badge)
+    public bool AdminSeen { get; set; }
 }
