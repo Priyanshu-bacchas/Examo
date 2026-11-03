@@ -47,6 +47,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<AppSetting> AppSettings { get; set; }
 
+    public virtual DbSet<AdminNotification> AdminNotifications { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -386,6 +388,46 @@ public partial class ExamoDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(
                     "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // ADMIN NOTIFICATIONS (NotifyMe)
+        // =========================
+
+        modelBuilder.Entity<AdminNotification>(entity =>
+        {
+            entity.ToTable("AdminNotifyItems");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Type)
+                .HasMaxLength(30)
+                .IsRequired();
+
+            entity.Property(e => e.Title)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Message)
+                .HasMaxLength(1000)
+                .IsRequired();
+
+            entity.Property(e => e.UserName)
+                .HasMaxLength(150);
+
+            entity.Property(e => e.UserEmail)
+                .HasMaxLength(200);
+
+            entity.Property(e => e.DedupeKey)
+                .HasMaxLength(100)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => e.DedupeKey)
+                .IsUnique();
         });
 
         OnModelCreatingPartial(modelBuilder);
