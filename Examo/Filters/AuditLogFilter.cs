@@ -37,8 +37,10 @@ public class AuditLogFilter : IAsyncActionFilter
                 context.RouteData.Values["controller"]?.ToString()
                 ?? "Unknown";
 
-            // Auth khud log karta hai; Notifications (read/delete) logs me nahi jaate
-            if (controller == "Auth" || controller == "Notifications")
+            // Auth khud log karta hai; Notifications / AdminNotifications (read/delete) logs me nahi jaate
+            if (controller == "Auth" ||
+                controller == "Notifications" ||
+                controller == "AdminNotifications")
                 return;
 
             if (executed.Exception != null &&

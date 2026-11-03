@@ -124,7 +124,7 @@ public class HelpController : ControllerBase
             });
         }
 
-        _context.SupportMessages.Add(new SupportMessage
+        var support = new SupportMessage
         {
             UserId = userId,
             Name = name,
@@ -133,9 +133,23 @@ public class HelpController : ControllerBase
             Message = message,
             Status = StatusOpen,
             CreatedAt = DateTime.UtcNow
-        });
+        };
+
+        _context.SupportMessages.Add(support);
 
         await _context.SaveChangesAsync();
+
+        // Admin ke NotifyMe me notification (fail ho to bhi message submit ho chuka hai)
+        await AdminNotificationWriter.AddAsync(
+            _context,
+            AdminNotificationWriter.TypeSupport,
+            $"New help message: {subject}",
+            $"{name} ({email}) sent a message: {Preview(message)}",
+            userId,
+            name,
+            email,
+            support.Id,
+            $"support:{support.Id}");
 
         _cache.Set(limitKey, count + 1, Window);
 
@@ -147,6 +161,19 @@ public class HelpController : ControllerBase
         {
             Message = "Your message has been submitted successfully."
         });
+    }
+
+    // Notification me message ka chhota hissa
+    private static string Preview(string text)
+    {
+        var clean = (text ?? string.Empty)
+            .Replace("\r", " ")
+            .Replace("\n", " ")
+            .Trim();
+
+        return clean.Length <= 160
+            ? clean
+            : clean[..160] + "...";
     }
 
     // =====================================================

@@ -662,7 +662,51 @@ public class SubscriptionService : ISubscriptionService
 
         await CreatePurchaseNotificationAsync(payment, plan, end, now);
 
+        await CreateAdminNotificationAsync(payment, plan, end);
+
         await SendPaymentEmailAsync(payment, plan, payuPaymentId, end);
+    }
+
+    // Admin ke NotifyMe me "is student ne subscription liya" aati hai.
+    // Fail ho to bhi payment / plan par koi asar nahi.
+    private async Task CreateAdminNotificationAsync(
+        Payment payment,
+        SubscriptionPlan plan,
+        DateTime endsAt)
+    {
+        try
+        {
+            var student = await _db.Students
+                .AsNoTracking()
+                .Where(x => x.Id == payment.UserId)
+                .Select(x => new { x.Name, x.Email })
+                .FirstOrDefaultAsync();
+
+            var name = student?.Name ?? $"User #{payment.UserId}";
+            var email = student?.Email;
+
+            var amount = (payment.AmountPaise / 100m)
+                .ToString("0.00", CultureInfo.InvariantCulture);
+
+            await AdminNotificationWriter.AddAsync(
+                _db,
+                AdminNotificationWriter.TypeSubscription,
+                $"New subscription: {plan.Name}",
+                $"{name}" +
+                (string.IsNullOrWhiteSpace(email) ? "" : $" ({email})") +
+                $" subscribed to the {plan.Name} for Rs {amount}. " +
+                $"Valid till {LocalDateText(endsAt)}.",
+                payment.UserId,
+                name,
+                email,
+                payment.Id,
+                $"sub:{payment.Id}",
+                _logger);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Admin subscription notification failed.");
+        }
     }
 
     // Student ki Notifications me "Subscription activated" aati hai.
