@@ -15,6 +15,9 @@ public class AuditLogFilter : IAsyncActionFilter
     // Controller chahe to poora action naam khud de sakta hai (e.g. "Block User")
     public const string ActionKey = "AuditAction";
 
+    // Controller ye set kare (true) to is request ka log nahi banta (e.g. "message dekha")
+    public const string SkipKey = "AuditSkip";
+
     public async Task OnActionExecutionAsync(
         ActionExecutingContext context,
         ActionExecutionDelegate next)
@@ -48,6 +51,9 @@ public class AuditLogFilter : IAsyncActionFilter
             {
                 return;
             }
+
+            if (http.Items[SkipKey] is true)
+                return;
 
             var status =
                 (executed.Result as IStatusCodeActionResult)

@@ -518,7 +518,10 @@ CREATE TABLE IF NOT EXISTS ""SupportMessages"" (
 
 ALTER TABLE ""SupportMessages"" ADD COLUMN IF NOT EXISTS ""AdminReply"" varchar(5000) NULL;
 ALTER TABLE ""SupportMessages"" ADD COLUMN IF NOT EXISTS ""RepliedAt"" timestamp with time zone NULL;
-ALTER TABLE ""SupportMessages"" ADD COLUMN IF NOT EXISTS ""RepliedBy"" varchar(150) NULL;");
+ALTER TABLE ""SupportMessages"" ADD COLUMN IF NOT EXISTS ""RepliedBy"" varchar(150) NULL;
+
+-- Purane messages dekhe hue maane jayenge (DEFAULT true); naye messages false se aate hain
+ALTER TABLE ""SupportMessages"" ADD COLUMN IF NOT EXISTS ""AdminSeen"" boolean NOT NULL DEFAULT true;");
     }
     catch (Exception ex)
     {
