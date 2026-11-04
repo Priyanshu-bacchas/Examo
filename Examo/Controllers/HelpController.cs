@@ -436,6 +436,18 @@ public class HelpController : ControllerBase
         if (item == null)
             return NotFound(new { message = "Message not found." });
 
+        // Delete se pehle Backup me copy (Admin > Backup se restore ho sakta hai)
+        AdminBackupWriter.Stage(
+            _context,
+            AdminBackupWriter.SectionHelp,
+            "Help message",
+            item.Id,
+            item.Subject,
+            $"{item.Name} ({item.Email}) - {item.Status}",
+            item,
+            await AdminBackupWriter.GetAdminNameAsync(
+                _context, _currentUser.UserIdOrNull));
+
         _context.SupportMessages.Remove(item);
 
         await _context.SaveChangesAsync();

@@ -578,6 +578,21 @@ public class JobsController : ControllerBase
                     .ToListAsync());
         }
 
+        // Delete se pehle Backup me copy (Admin > Backup se restore ho sakta hai)
+        AdminBackupWriter.Stage(
+            _context,
+            AdminBackupWriter.SectionContent,
+            Label(item.Category),
+            item.Id,
+            item.ExamName,
+            Label(item.Category) +
+                (item.LastDate != null
+                    ? $" - last date {item.LastDate:dd MMM yyyy}"
+                    : ""),
+            item,
+            await AdminBackupWriter.GetAdminNameAsync(
+                _context, _currentUser.UserIdOrNull));
+
         _context.JobPosts.Remove(item);
         await _context.SaveChangesAsync();
 
