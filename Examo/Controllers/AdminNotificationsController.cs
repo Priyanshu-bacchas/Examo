@@ -1,4 +1,6 @@
 ﻿using Examo.Models;
+using Examo.Services;
+using Examo.Services.Interfaces;
 
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -14,10 +16,33 @@ namespace Examo.Controllers;
 public class AdminNotificationsController : ControllerBase
 {
     private readonly ExamoDbContext _context;
+    private readonly ICurrentUserService _currentUser;
 
-    public AdminNotificationsController(ExamoDbContext context)
+    public AdminNotificationsController(
+        ExamoDbContext context,
+        ICurrentUserService currentUser)
     {
         _context = context;
+        _currentUser = currentUser;
+    }
+
+    // Delete se pehle Backup me copy (Admin > Backup se restore ho sakta hai)
+    private static void StageBackup(
+        ExamoDbContext context,
+        AdminNotification item,
+        string? deletedBy)
+    {
+        AdminBackupWriter.Stage(
+            context,
+            AdminBackupWriter.SectionNotifyMe,
+            item.Type == AdminNotificationType.Support
+                ? "Help notification"
+                : "Subscription notification",
+            item.Id,
+            item.Title,
+            item.Message,
+            item,
+            deletedBy);
     }
 
     // GET /api/Admin/notifications?type=support|subscription&unreadOnly=true&search=abc
@@ -141,6 +166,12 @@ public class AdminNotificationsController : ControllerBase
         if (item == null)
             return NotFound(new { message = "Notification not found." });
 
+        StageBackup(
+            _context,
+            item,
+            await AdminBackupWriter.GetAdminNameAsync(
+                _context, _currentUser.UserIdOrNull));
+
         _context.AdminNotifications.Remove(item);
 
         await _context.SaveChangesAsync();
@@ -152,11 +183,24 @@ public class AdminNotificationsController : ControllerBase
     [HttpDelete("clear-read")]
     public async Task<IActionResult> ClearRead()
     {
-        var removed = await _context.AdminNotifications
+        var readItems = await _context.AdminNotifications
             .Where(x => x.IsRead)
-            .ExecuteDeleteAsync();
+            .ToListAsync();
 
-        return Ok(new { message = $"{removed} notification(s) cleared." });
+        var adminName = await AdminBackupWriter.GetAdminNameAsync(
+            _context, _currentUser.UserIdOrNull);
+
+        foreach (var item in readItems)
+            StageBackup(_context, item, adminName);
+
+        _context.AdminNotifications.RemoveRange(readItems);
+
+        await _context.SaveChangesAsync();
+
+        return Ok(new
+        {
+            message = $"{readItems.Count} notification(s) cleared."
+        });
     }
 }
 

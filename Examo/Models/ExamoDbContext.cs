@@ -49,6 +49,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<AdminNotification> AdminNotifications { get; set; }
 
+    public virtual DbSet<AdminBackupItem> AdminBackupItems { get; set; }
+
     protected override void OnModelCreating(
         ModelBuilder modelBuilder)
     {
@@ -428,6 +430,45 @@ public partial class ExamoDbContext : DbContext
 
             entity.HasIndex(e => e.DedupeKey)
                 .IsUnique();
+        });
+
+        // =========================
+        // ADMIN BACKUP (deleted data)
+        // =========================
+
+        modelBuilder.Entity<AdminBackupItem>(entity =>
+        {
+            entity.ToTable("AdminBackupItems");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Section)
+                .HasMaxLength(20)
+                .IsRequired();
+
+            entity.Property(e => e.ItemType)
+                .HasMaxLength(40)
+                .IsRequired();
+
+            entity.Property(e => e.Title)
+                .HasMaxLength(300)
+                .IsRequired();
+
+            entity.Property(e => e.Summary)
+                .HasMaxLength(600)
+                .IsRequired();
+
+            entity.Property(e => e.DataJson)
+                .IsRequired();
+
+            entity.Property(e => e.DeletedBy)
+                .HasMaxLength(150);
+
+            entity.Property(e => e.DeletedAt)
+                .HasDefaultValueSql(
+                    "CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.Section, e.DeletedAt });
         });
 
         OnModelCreatingPartial(modelBuilder);
