@@ -39,6 +39,8 @@ public partial class ExamoDbContext : DbContext
 
     public virtual DbSet<JobPost> JobPosts { get; set; }
 
+    public virtual DbSet<Ebook> Ebooks { get; set; }
+
     public virtual DbSet<Payment> Payments { get; set; }
 
     public virtual DbSet<UserSubscription> UserSubscriptions { get; set; }
@@ -254,6 +256,38 @@ public partial class ExamoDbContext : DbContext
             entity.Property(e => e.CreatedAt)
                 .HasDefaultValueSql(
                     "CURRENT_TIMESTAMP");
+        });
+
+        // =========================
+        // EBOOKS
+        // =========================
+
+        modelBuilder.Entity<Ebook>(entity =>
+        {
+            entity.ToTable("Ebooks");
+
+            entity.HasKey(e => e.Id);
+
+            entity.Property(e => e.Title)
+                .HasMaxLength(200)
+                .IsRequired();
+
+            entity.Property(e => e.Description)
+                .HasMaxLength(1000);
+
+            entity.Property(e => e.Access)
+                .HasMaxLength(10)
+                .IsRequired()
+                .HasDefaultValue("Free");
+
+            entity.Property(e => e.StoragePath)
+                .HasMaxLength(500)
+                .IsRequired();
+
+            entity.Property(e => e.CreatedAt)
+                .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasIndex(e => new { e.Access, e.IsDraft, e.CreatedAt });
         });
 
         // =========================
