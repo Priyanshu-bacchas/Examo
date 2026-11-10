@@ -35,6 +35,7 @@ public class EbooksController : ControllerBase
         [FromQuery] string? access,
         [FromQuery] bool includeDrafts = false)
     {
+        var isAdmin = _currentUser.IsAdmin;
         var query = _db.Ebooks.AsNoTracking();
 
         if (!(_currentUser.IsAdmin && includeDrafts))
@@ -59,7 +60,7 @@ public class EbooksController : ControllerBase
                 PublishStatus = x.IsDraft ? "Draft" : "Published",
                 x.SizeBytes,
                 x.CreatedAt,
-                Locked = x.Access == "Paid" && !_currentUser.IsAdmin
+                Locked = x.Access == "Paid" && !isAdmin
             })
             .ToListAsync();
 
