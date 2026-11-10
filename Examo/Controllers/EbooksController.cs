@@ -195,7 +195,8 @@ public class EbooksController : ControllerBase
 
     private async Task<IActionResult> CreateFileUrl(int id, bool download)
     {
-        var ebook = await _db.Ebooks.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && !x.IsDraft);
+        var isAdmin = _currentUser.IsAdmin;
+        var ebook = await _db.Ebooks.AsNoTracking().FirstOrDefaultAsync(x => x.Id == id && (isAdmin || !x.IsDraft));
         if (ebook == null) return NotFound(new { message = "Ebook not found." });
 
         if (ebook.Access == "Paid" && !_currentUser.IsAdmin)
