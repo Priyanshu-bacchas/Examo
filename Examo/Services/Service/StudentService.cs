@@ -3,6 +3,8 @@ using Examo.Models;
 using Examo.Repositories.Interfaces;
 using Examo.Services.Interfaces;
 
+using Microsoft.AspNetCore.Identity;
+
 namespace Examo.Services;
 
 public class StudentService : IStudentService
@@ -10,6 +12,9 @@ public class StudentService : IStudentService
     private const int MinPasswordLength = 6;
 
     private readonly IStudentRepository _repository;
+
+    // Password kabhi plain save nahi hota, hamesha hash (PBKDF2)
+    private readonly PasswordHasher<Student> _passwordHasher = new();
 
     public StudentService(
         IStudentRepository repository)
@@ -84,13 +89,18 @@ public class StudentService : IStudentService
             Role = role,
             CreatedAt = DateTime.UtcNow,
 
-            // Login password (hash nahi). Khali = abhi login nahi.
-            Password = string.IsNullOrWhiteSpace(dto.Password)
-                ? string.Empty
-                : dto.Password,
+            // Plain password kabhi save nahi hota
+            Password = string.Empty,
 
             PasswordHash = string.Empty
         };
+
+        // Password diya ho to hash save karo. Khali = abhi login nahi.
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            student.PasswordHash =
+                _passwordHasher.HashPassword(student, dto.Password);
+        }
 
         return await _repository.AddAsync(student);
     }
@@ -163,10 +173,10 @@ public class StudentService : IStudentService
         // Sirf tab badlo jab naya password diya ho
         if (!string.IsNullOrWhiteSpace(dto.Password))
         {
-            student.Password = dto.Password;
+            student.Password = string.Empty;
 
-            // Purana hash hata do, warna purana password bhi chalta rahega
-            student.PasswordHash = string.Empty;
+            student.PasswordHash =
+                _passwordHasher.HashPassword(student, dto.Password);
         }
 
         return await _repository.UpdateAsync(
@@ -213,10 +223,10 @@ public class StudentService : IStudentService
         if (student == null)
             return null;
 
-        student.Password = newPassword;
+        student.Password = string.Empty;
 
-        // Purana hash hata do, warna purana password bhi chalta rahega
-        student.PasswordHash = string.Empty;
+        student.PasswordHash =
+            _passwordHasher.HashPassword(student, newPassword);
 
         return await _repository.UpdateAsync(student);
     }

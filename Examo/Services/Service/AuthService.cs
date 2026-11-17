@@ -107,8 +107,9 @@ public class AuthService : IAuthService
 
             existing.Name = fullName;
             existing.MobileNumber = mobile;
-            existing.Password = dto.Password;
-            existing.PasswordHash = string.Empty;
+            existing.Password = string.Empty;
+            existing.PasswordHash =
+                _passwordHasher.HashPassword(existing, dto.Password);
 
             student = existing;
         }
@@ -131,14 +132,17 @@ public class AuthService : IAuthService
 
                 CreatedAt = DateTime.UtcNow,
 
-                // Login password (StudentService jaisa hi: plain, hash nahi)
-                Password = dto.Password,
+                // Plain password kabhi save nahi hota (hash neeche set hota hai)
+                Password = string.Empty,
 
                 PasswordHash = string.Empty,
 
                 // OTP verify hone tak false
                 EmailVerified = false
             };
+
+            student.PasswordHash =
+                _passwordHasher.HashPassword(student, dto.Password);
 
             student = await _studentRepository.AddAsync(student);
         }
@@ -246,7 +250,7 @@ public class AuthService : IAuthService
             return null;
         }
 
-        if (!IsPasswordValid(student, dto.Password))
+        if (!await VerifyAndUpgradePasswordAsync(student, dto.Password))
         {
             await _activityLog.LogAsync(
                 "Login Failed",
@@ -407,9 +411,10 @@ public class AuthService : IAuthService
                 dto.Otp,
                 PurposeReset);
 
-        // Project ka existing system: plain Password column
-        student.Password = dto.NewPassword;
-        student.PasswordHash = string.Empty;
+        // Naya password hash karke save (plain kabhi nahi)
+        student.Password = string.Empty;
+        student.PasswordHash =
+            _passwordHasher.HashPassword(student, dto.NewPassword);
 
         // OTP email par aaya = email ownership prove ho gayi
         student.EmailVerified = true;
@@ -616,9 +621,10 @@ public class AuthService : IAuthService
     // PASSWORD CHECK
     // =========================
 
-    // Naya system: plain Password column (admin reset isi ko badalta hai).
-    // Purane accounts: PasswordHash se verify.
-    private bool IsPasswordValid(
+    // Password hamesha PasswordHash (PBKDF2) se verify hota hai.
+    // Agar kisi purane account me plain "Password" bacha ho (startup migration
+    // chhoot gaya ho), to sahi password par use turant hash me badal dete hain.
+    private async Task<bool> VerifyAndUpgradePasswordAsync(
         Student student,
         string? password)
     {
@@ -627,7 +633,20 @@ public class AuthService : IAuthService
 
         if (!string.IsNullOrEmpty(student.Password))
         {
-            return student.Password == password;
+            var legacyOk = CryptographicOperations.FixedTimeEquals(
+                Encoding.UTF8.GetBytes(student.Password),
+                Encoding.UTF8.GetBytes(password));
+
+            if (!legacyOk)
+                return false;
+
+            student.PasswordHash =
+                _passwordHasher.HashPassword(student, password);
+            student.Password = string.Empty;
+
+            await _studentRepository.UpdateAsync(student);
+
+            return true;
         }
 
         if (string.IsNullOrWhiteSpace(student.PasswordHash))
@@ -635,11 +654,24 @@ public class AuthService : IAuthService
 
         try
         {
-            return _passwordHasher.VerifyHashedPassword(
+            var result = _passwordHasher.VerifyHashedPassword(
                 student,
                 student.PasswordHash,
-                password)
-                != PasswordVerificationResult.Failed;
+                password);
+
+            if (result == PasswordVerificationResult.Failed)
+                return false;
+
+            // Hash ka purana format/iterations ho to naya hash bana do
+            if (result == PasswordVerificationResult.SuccessRehashNeeded)
+            {
+                student.PasswordHash =
+                    _passwordHasher.HashPassword(student, password);
+
+                await _studentRepository.UpdateAsync(student);
+            }
+
+            return true;
         }
         catch (FormatException)
         {
