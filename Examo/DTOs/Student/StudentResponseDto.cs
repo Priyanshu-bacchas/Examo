@@ -12,8 +12,6 @@ public class StudentResponseDto
 
     public string Email { get; set; } = string.Empty;
 
-    public string Password { get; set; } = string.Empty;
-
     public string Role { get; set; } = "Student";
 
     public bool IsBlocked { get; set; }
@@ -28,7 +26,6 @@ public class StudentResponseDto
             Name = s.Name,
             MobileNumber = s.MobileNumber,
             Email = s.Email,
-            Password = s.Password,
             Role = s.Role,
             IsBlocked = s.IsBlocked,
             CreatedAt = s.CreatedAt

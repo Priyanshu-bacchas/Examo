@@ -492,6 +492,49 @@ ON CONFLICT (""PlanKey"") DO NOTHING;");
 }
 
 // =====================================================
+// PASSWORD MIGRATION (ek baar)
+// Purane plain-text passwords ko hash me badalta hai aur plain column
+// khali kar deta hai. Sab hash ho jaane ke baad ye kuch nahi karta.
+// =====================================================
+
+using (var scope = app.Services.CreateScope())
+{
+    try
+    {
+        var db = scope.ServiceProvider
+            .GetRequiredService<ExamoDbContext>();
+
+        var hasher =
+            new Microsoft.AspNetCore.Identity.PasswordHasher<Student>();
+
+        var legacy = db.Students
+            .Where(s => s.Password != "")
+            .ToList();
+
+        foreach (var student in legacy)
+        {
+            student.PasswordHash =
+                hasher.HashPassword(student, student.Password);
+
+            student.Password = string.Empty;
+        }
+
+        if (legacy.Count > 0)
+        {
+            db.SaveChanges();
+
+            Console.WriteLine(
+                $"Password migration: {legacy.Count} password(s) hashed.");
+        }
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(
+            "Password migration failed: " + ex.Message);
+    }
+}
+
+// =====================================================
 // SUPPORT MESSAGES TABLE (Help > Contact Us)
 // Table na ho to apne aap ban jayegi, ho to kuch nahi hota.
 // =====================================================
